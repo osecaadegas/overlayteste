@@ -542,11 +542,8 @@ const CustomizationManager = {
       resetBgBtn.addEventListener('click', () => this.resetBackground());
     }
 
-    // Ad image input (sidebar art button)
-    const adImageInput = document.getElementById('ad-image-input');
-    if (adImageInput) {
-      adImageInput.addEventListener('change', (e) => this.handleBackgroundUpload(e));
-    }
+    // Note: ad-image-input is now handled by script-new.js for draggable media
+    // Background upload is only through the customization panel button
 
     // Theme presets
     const themePresets = document.querySelectorAll('.theme-preset');
@@ -1001,9 +998,28 @@ const CustomizationManager = {
   },
 
   handleBackgroundUpload(e) {
-    // This function has been moved to script-new.js
-    // Image/video uploads are now handled by the main app
-    console.warn('handleBackgroundUpload called from utils.js - this is deprecated');
+    const file = e.target.files[0];
+    if (file && file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const imageSrc = event.target.result;
+        
+        // Apply background to body
+        document.body.classList.add('custom-background');
+        document.body.style.setProperty('background', '', 'important');
+        document.body.style.setProperty('background-color', '', 'important');
+        document.body.style.setProperty('background-image', `url("${imageSrc}")`, 'important');
+        document.body.style.setProperty('background-size', 'cover', 'important');
+        document.body.style.setProperty('background-position', 'center', 'important');
+        document.body.style.setProperty('background-repeat', 'no-repeat', 'important');
+        document.body.style.setProperty('background-attachment', 'fixed', 'important');
+        
+        // Save to storage
+        StorageHelper.set('customBackground', imageSrc);
+        console.log('Background image applied successfully');
+      };
+      reader.readAsDataURL(file);
+    }
   },
 
   resetBackground() {
