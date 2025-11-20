@@ -16,6 +16,7 @@
   <script src="js/tournament.js"></script>
   <script src="js/bonushunt.js"></script>
   <script src="js/randomslot.js"></script>
+  <script src="js/tutorial.js"></script>
   
   <!-- Main Script -->
   <script defer src="script-new.js"></script>
@@ -78,7 +79,7 @@
             <img src="./assets/crossair.png" alt="Bonus Hunt" class="sidebar-icon-img">
           </button>
           <button class="sidebar-btn" id="bo-btn">
-            <img src="./assets/info.png" alt="Bonus Open" class="sidebar-icon-img">
+            <img src="./assets/info.png" alt="Tutorial" class="sidebar-icon-img">
           </button>
           <button class="sidebar-btn" id="random-slot-btn">
             <img src="./assets/randomslot.png" alt="Random" class="sidebar-icon-img">
@@ -90,7 +91,7 @@
             <label for="ad-image-input" style="cursor: pointer; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;">
               <img src="./assets/art.png" alt="Art" class="sidebar-icon-img">
             </label>
-            <input type="file" id="ad-image-input" accept="image/*" style="display:none;">
+            <input type="file" id="ad-image-input" accept="image/*,video/*" style="display:none;">
           </button>
           <button class="sidebar-btn" id="lock-btn">
             <img id="lock-icon" src="./assets/unlock.png" alt="Lock/Unlock" class="sidebar-icon-img" style="width: 100%; height: 100%; object-fit: contain;">
@@ -128,7 +129,12 @@
             <input type="number" id="bet-size-input" class="middle-input" placeholder="Enter bet size" min="0" step="any" />
           </label>
         </div>
-        <div class="selected-slot-display" style="display: none;"></div>
+        <div class="middle-panel-row" id="slot-img-url-row" style="display: none;">
+          <label class="middle-input-label" style="width: 100%;">
+            Slot Image URL
+            <input type="url" id="slot-img-url-input" class="middle-input" placeholder="Paste image URL here" />
+          </label>
+        </div>
         <div class="middle-panel-actions">
           <div class="middle-checkbox-row">
             <label class="middle-checkbox">
@@ -141,7 +147,6 @@
               <span class="middle-icon">🖼️</span>
               <span>Slot Image</span>
             </button>
-            <input type="url" id="slot-img-url-input" class="middle-input slot-img-url-input" placeholder="Paste image URL" style="display:none; width:180px; margin-right:1rem;" />
             <button class="middle-btn small-btn" id="edit-slots-btn">
               <span class="middle-icon">✏️</span>
               <span>Edit Slots</span>
@@ -544,10 +549,26 @@
         </div>
       </aside>
     </div>
+  </div>
 
-    <!-- Selected Slot Display Card (Right Side) -->
-    <div class="selected-slot-display" id="selected-slot-display" style="display: none;">
-      <img src="https://i.imgur.com/8E3ucNx.png" alt="Selected Slot" class="selected-slot-image" id="selected-slot-image" />
+  <!-- Tutorial Overlay -->
+  <div class="tutorial-overlay" id="tutorial-overlay" style="display: none;">
+    <div class="tutorial-container">
+      <button class="tutorial-close" id="close-tutorial-btn">×</button>
+      <div class="tutorial-header">
+        <h2 class="tutorial-title">Tutorial - Como Funciona</h2>
+        <div class="tutorial-progress">
+          <span class="tutorial-step-counter"><span id="current-step">1</span> / <span id="total-steps">11</span></span>
+        </div>
+      </div>
+      <div class="tutorial-content" id="tutorial-content">
+        <!-- Tutorial steps will be dynamically inserted here -->
+      </div>
+      <div class="tutorial-navigation">
+        <button class="tutorial-btn tutorial-prev" id="tutorial-prev">← Anterior</button>
+        <button class="tutorial-btn tutorial-skip" id="tutorial-skip">Saltar Tutorial</button>
+        <button class="tutorial-btn tutorial-next" id="tutorial-next">Próximo →</button>
+      </div>
     </div>
   </div>
 

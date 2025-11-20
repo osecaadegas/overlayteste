@@ -78,7 +78,8 @@ class StreamerOverlayApp {
     const moduleInits = [
       { name: 'tournament', class: 'TournamentManager' },
       { name: 'bonusHunt', class: 'BonusHuntManager' },
-      { name: 'randomSlot', class: 'RandomSlotManager' }
+      { name: 'randomSlot', class: 'RandomSlotManager' },
+      { name: 'tutorial', class: 'TutorialManager' }
     ];
 
     for (const moduleInfo of moduleInits) {
@@ -98,6 +99,7 @@ class StreamerOverlayApp {
     window.tournamentManager = this.modules.tournament;
     window.bonusHuntManager = this.modules.bonusHunt;
     window.randomSlotManager = this.modules.randomSlot;
+    window.tutorialManager = this.modules.tutorial;
   }
 
   setupGlobalEventListeners() {
@@ -180,6 +182,27 @@ class StreamerOverlayApp {
           });
         }
         updateInfoPanelVisibility();
+      });
+    }
+
+    // Tutorial button (bo-btn with info icon)
+    if (boBtn) {
+      boBtn.addEventListener('click', () => {
+        console.log('Tutorial button clicked');
+        console.log('window.tutorialManager:', window.tutorialManager);
+        console.log('window.TutorialManager class:', window.TutorialManager);
+        
+        if (window.tutorialManager && typeof window.tutorialManager.openTutorial === 'function') {
+          console.log('Opening tutorial...');
+          window.tutorialManager.openTutorial();
+        } else if (window.TutorialManager) {
+          console.warn('TutorialManager class exists but instance not created, creating now...');
+          window.tutorialManager = new window.TutorialManager();
+          window.tutorialManager.openTutorial();
+        } else {
+          console.error('Tutorial manager not initialized');
+          console.error('Available modules:', Object.keys(this.modules || {}));
+        }
       });
     }
 
@@ -324,18 +347,33 @@ class StreamerOverlayApp {
         // Lock/unlock draggable images
         document.querySelectorAll('.draggable-image-container').forEach(container => {
           if (isLocked) {
+            container.classList.add('locked');
             container.style.cursor = 'default';
             container.style.border = 'none';
+            container.style.boxShadow = 'none';
             const controls = container.querySelector('.image-controls');
             if (controls) controls.style.display = 'none';
-            const img = container.querySelector('img');
-            if (img) img.style.border = 'none';
+            const resizeHandle = container.querySelector('.resize-handle');
+            if (resizeHandle) resizeHandle.style.display = 'none';
+            const video = container.querySelector('video');
+            if (video) {
+              video.controls = false;
+              video.removeAttribute('controls');
+            }
           } else {
+            container.classList.remove('locked');
             container.style.cursor = 'move';
+            container.style.border = '';
+            container.style.boxShadow = '';
             const controls = container.querySelector('.image-controls');
             if (controls) controls.style.display = 'flex';
-            const img = container.querySelector('img');
-            if (img) img.style.border = '2px solid rgba(255, 215, 0, 0.5)';
+            const resizeHandle = container.querySelector('.resize-handle');
+            if (resizeHandle) resizeHandle.style.display = 'block';
+            const video = container.querySelector('video');
+            if (video) {
+              video.controls = true;
+              video.setAttribute('controls', 'controls');
+            }
           }
         });
       });
@@ -470,9 +508,12 @@ class StreamerOverlayApp {
       adInput.addEventListener('change', (e) => {
         const file = adInput.files[0];
         if (file) {
+          const fileType = file.type.split('/')[0]; // 'image' or 'video'
           const reader = new FileReader();
           reader.onload = (evt) => {
-            this.createDraggableImage(evt.target.result);
+            this.createDraggableMedia(evt.target.result, fileType);
+            // Clear the input so the same file can be selected again
+            adInput.value = '';
           };
           reader.readAsDataURL(file);
         }
@@ -550,57 +591,192 @@ class StreamerOverlayApp {
     });
   }
 
-  createDraggableImage(src) {
-    // Create draggable image functionality
-    const imageContainer = document.createElement('div');
-    imageContainer.className = 'draggable-image-container';
-    imageContainer.innerHTML = `
-      <img src="${src}" alt="Uploaded Image" class="draggable-image">
-      <button class="close-btn">×</button>
-      <div class="resize-handle"></div>
-    `;
+  createDraggableMedia(src, type = 'image') {
+    console.log('Creating draggable media with controls:', type, 'src length:', src?.length);
+    
+    // Prevent creating empty containers
+    if (!src || src.length === 0) {
+      console.warn('Attempted to create draggable media without valid source');
+      return;
+    }
+    
+    const mediaContainer = document.createElement('div');
+    mediaContainer.className = 'draggable-image-container';
+    mediaContainer.style.zIndex = '1000';
+    mediaContainer.style.position = 'absolute';
+    mediaContainer.style.left = '100px';
+    mediaContainer.style.top = '100px';
+    mediaContainer.style.width = 'auto';
+    mediaContainer.style.height = 'auto';
+    
+    // Create media element
+    let mediaElement;
+    if (type === 'video') {
+      mediaElement = document.createElement('video');
+      mediaElement.src = src;
+      mediaElement.className = 'draggable-image';
+      mediaElement.style.maxWidth = '600px';
+      mediaElement.style.maxHeight = '400px';
+      mediaElement.style.display = 'block';
+      mediaElement.controls = !window.isLayoutLocked;
+      mediaElement.loop = true;
+      mediaElement.autoplay = true;
+      mediaElement.muted = true; // Start muted for autoplay
+    } else {
+      mediaElement = document.createElement('img');
+      mediaElement.src = src;
+      mediaElement.alt = 'Uploaded Media';
+      mediaElement.className = 'draggable-image';
+      mediaElement.style.maxWidth = '400px';
+      mediaElement.style.display = 'block';
+    }
+    
+    // Create controls container
+    const controlsDiv = document.createElement('div');
+    controlsDiv.className = 'image-controls';
+    controlsDiv.style.display = window.isLayoutLocked ? 'none' : 'flex';
+    
+    if (type === 'video') {
+      controlsDiv.innerHTML = `
+        <button class="layer-btn layer-up" title="Mover para frente">↑</button>
+        <button class="layer-btn layer-down" title="Mover para trás">↓</button>
+        <button class="layer-btn loop-btn active" title="Loop On/Off">🔁</button>
+        <span class="layer-display">Layer: 1000</span>
+        <button class="close-btn">×</button>
+      `;
+    } else {
+      controlsDiv.innerHTML = `
+        <button class="layer-btn layer-up" title="Mover para frente">↑</button>
+        <button class="layer-btn layer-down" title="Mover para trás">↓</button>
+        <span class="layer-display">Layer: 1000</span>
+        <button class="close-btn">×</button>
+      `;
+    }
+    
+    // Create resize handle
+    const resizeHandle = document.createElement('div');
+    resizeHandle.className = 'resize-handle';
+    resizeHandle.style.display = window.isLayoutLocked ? 'none' : 'block';
+    
+    // Apply locked state to container if needed
+    if (window.isLayoutLocked) {
+      mediaContainer.classList.add('locked');
+      mediaContainer.style.cursor = 'default';
+      mediaContainer.style.border = 'none';
+      mediaContainer.style.boxShadow = 'none';
+      if (type === 'video') {
+        mediaElement.controls = false;
+      }
+    }
+    
+    // Append elements
+    mediaContainer.appendChild(mediaElement);
+    mediaContainer.appendChild(controlsDiv);
+    mediaContainer.appendChild(resizeHandle);
+    
+    document.body.appendChild(mediaContainer);
+    console.log('Media container appended, type:', type, 'locked:', window.isLayoutLocked);
 
-    document.body.appendChild(imageContainer);
-
-    // Add drag functionality (simplified)
+    // Add drag functionality
     let isDragging = false;
-    let startX, startY, startLeft, startTop;
+    let isResizing = false;
+    let startX, startY, startLeft, startTop, startWidth, startHeight;
 
-    imageContainer.addEventListener('mousedown', (e) => {
-      if (e.target.classList.contains('close-btn') || e.target.classList.contains('resize-handle')) return;
+    mediaContainer.addEventListener('mousedown', (e) => {
+      if (window.isLayoutLocked) return;
+      
+      if (e.target.classList.contains('close-btn') || 
+          e.target.classList.contains('layer-btn')) return;
+      
+      if (e.target.classList.contains('resize-handle')) {
+        isResizing = true;
+        startX = e.clientX;
+        startY = e.clientY;
+        startWidth = mediaContainer.offsetWidth;
+        startHeight = mediaContainer.offsetHeight;
+        e.preventDefault();
+        return;
+      }
       
       isDragging = true;
       startX = e.clientX;
       startY = e.clientY;
-      startLeft = imageContainer.offsetLeft;
-      startTop = imageContainer.offsetTop;
+      startLeft = mediaContainer.offsetLeft;
+      startTop = mediaContainer.offsetTop;
     });
 
     document.addEventListener('mousemove', (e) => {
+      if (window.isLayoutLocked) return;
+      
+      if (isResizing) {
+        const deltaX = e.clientX - startX;
+        const deltaY = e.clientY - startY;
+        const newWidth = Math.max(100, startWidth + deltaX);
+        const newHeight = Math.max(100, startHeight + deltaY);
+        
+        mediaContainer.style.width = newWidth + 'px';
+        mediaContainer.style.height = newHeight + 'px';
+        
+        if (mediaElement) {
+          mediaElement.style.maxWidth = '100%';
+          mediaElement.style.maxHeight = '100%';
+          mediaElement.style.width = '100%';
+          mediaElement.style.height = '100%';
+          mediaElement.style.objectFit = 'contain';
+        }
+        return;
+      }
+      
       if (!isDragging) return;
       
       const newLeft = startLeft + e.clientX - startX;
       const newTop = startTop + e.clientY - startY;
       
-      imageContainer.style.left = newLeft + 'px';
-      imageContainer.style.top = newTop + 'px';
+      mediaContainer.style.left = newLeft + 'px';
+      mediaContainer.style.top = newTop + 'px';
     });
 
     document.addEventListener('mouseup', () => {
       isDragging = false;
+      isResizing = false;
     });
+
+    // Layer controls
+    const layerDisplay = mediaContainer.querySelector('.layer-display');
+    const layerUpBtn = mediaContainer.querySelector('.layer-up');
+    const layerDownBtn = mediaContainer.querySelector('.layer-down');
+
+    layerUpBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      let currentZ = parseInt(mediaContainer.style.zIndex) || 1000;
+      currentZ += 10;
+      mediaContainer.style.zIndex = currentZ;
+      layerDisplay.textContent = `Layer: ${currentZ}`;
+    });
+
+    layerDownBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      let currentZ = parseInt(mediaContainer.style.zIndex) || 1000;
+      currentZ = Math.max(1, currentZ - 10);
+      mediaContainer.style.zIndex = currentZ;
+      layerDisplay.textContent = `Layer: ${currentZ}`;
+    });
+
+    // Loop button (only for videos)
+    if (type === 'video') {
+      const loopBtn = mediaContainer.querySelector('.loop-btn');
+      loopBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        mediaElement.loop = !mediaElement.loop;
+        loopBtn.classList.toggle('active', mediaElement.loop);
+        loopBtn.style.opacity = mediaElement.loop ? '1' : '0.5';
+      });
+    }
 
     // Close button
-    imageContainer.querySelector('.close-btn').addEventListener('click', () => {
-      imageContainer.remove();
+    mediaContainer.querySelector('.close-btn').addEventListener('click', () => {
+      mediaContainer.remove();
     });
-  }
-
-  hideSelectedSlot() {
-    const selectedSlotDisplay = document.querySelector('.selected-slot-display');
-    if (selectedSlotDisplay) {
-      selectedSlotDisplay.style.display = 'none';
-    }
   }
 
   initializeSidebarToggle() {
