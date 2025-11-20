@@ -5,6 +5,7 @@ class BonusHuntManager {
     this.bonuses = [];
     this.totalBet = 0;
     this.totalPayout = 0;
+    this.customSlotImages = {}; // Store custom image URLs
     this.init();
   }
 
@@ -80,6 +81,23 @@ class BonusHuntManager {
     }
     if (stopMoneyInput) {
       stopMoneyInput.addEventListener('input', () => this.updateStatsBar());
+    }
+
+    // Slot image URL button
+    const slotImgUrlBtn = document.getElementById('slot-img-url-btn');
+    if (slotImgUrlBtn) {
+      slotImgUrlBtn.addEventListener('click', () => this.toggleSlotImageUrlInput());
+    }
+
+    // Slot image URL input
+    const slotImgUrlInput = document.getElementById('slot-img-url-input');
+    if (slotImgUrlInput) {
+      slotImgUrlInput.addEventListener('blur', () => this.saveCustomSlotImage());
+      slotImgUrlInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          this.saveCustomSlotImage();
+        }
+      });
     }
   }
 
@@ -159,6 +177,57 @@ class BonusHuntManager {
     }
   }
 
+  toggleSlotImageUrlInput() {
+    const slotImgUrlRow = document.getElementById('slot-img-url-row');
+    const slotImgUrlInput = document.getElementById('slot-img-url-input');
+    const slotNameInput = document.getElementById('slot-name-input');
+    
+    if (!slotImgUrlRow || !slotImgUrlInput) return;
+    
+    const slotName = slotNameInput ? slotNameInput.value.trim() : '';
+    
+    if (slotImgUrlRow.style.display === 'none') {
+      slotImgUrlRow.style.display = 'block';
+      // Pre-fill with existing custom image if available
+      if (slotName && this.customSlotImages[slotName.toLowerCase()]) {
+        slotImgUrlInput.value = this.customSlotImages[slotName.toLowerCase()];
+      }
+      slotImgUrlInput.focus();
+    } else {
+      slotImgUrlRow.style.display = 'none';
+      slotImgUrlInput.value = '';
+    }
+  }
+
+  saveCustomSlotImage() {
+    const slotNameInput = document.getElementById('slot-name-input');
+    const slotImgUrlInput = document.getElementById('slot-img-url-input');
+    const slotImgUrlRow = document.getElementById('slot-img-url-row');
+    
+    if (!slotNameInput || !slotImgUrlInput) return;
+    
+    const slotName = slotNameInput.value.trim();
+    const imageUrl = slotImgUrlInput.value.trim();
+    
+    if (!slotName) {
+      this.showFeedback('Please enter a slot name first', 'error');
+      return;
+    }
+    
+    if (imageUrl) {
+      this.customSlotImages[slotName.toLowerCase()] = imageUrl;
+      this.showFeedback(`Custom image saved for ${slotName}`, 'success');
+    } else {
+      // Remove custom image if URL is empty
+      delete this.customSlotImages[slotName.toLowerCase()];
+    }
+    
+    // Hide the input row
+    if (slotImgUrlRow) {
+      slotImgUrlRow.style.display = 'none';
+    }
+  }
+
   handleSuperCheckbox() {
     const superCheckbox = document.getElementById('super-checkbox');
     const slotNameInput = document.getElementById('slot-name-input');
@@ -216,6 +285,12 @@ class BonusHuntManager {
   }
 
   getSlotImage(slotName) {
+    // First check if there's a custom image URL
+    if (this.customSlotImages[slotName.toLowerCase()]) {
+      return this.customSlotImages[slotName.toLowerCase()];
+    }
+    
+    // Then check the slot database
     if (typeof window.slotDatabase !== 'undefined' && window.slotDatabase && window.slotDatabase.length > 0) {
       const slot = window.slotDatabase.find(s => s.name.toLowerCase() === slotName.toLowerCase());
       return slot ? slot.image : 'https://i.imgur.com/8E3ucNx.png';
