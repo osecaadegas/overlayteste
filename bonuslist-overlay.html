@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Bonus Hunt List - OBS Overlay</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  
+  <!-- Slot Database -->
+  <script src="slotdatabase.js"></script>
+  
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Inter', Arial, sans-serif;
+      background: transparent;
+      color: #f3f4f6;
+      overflow: hidden;
+      padding: 20px;
+    }
+
+    .bonus-list-container {
+      max-width: 450px;
+      margin: 0 auto;
+    }
+
+    .bonus-list-header {
+      background: linear-gradient(135deg, rgba(147, 70, 255, 0.3), rgba(0, 225, 255, 0.3));
+      padding: 15px 20px;
+      border-radius: 12px 12px 0 0;
+      border: 2px solid rgba(147, 70, 255, 0.5);
+      border-bottom: none;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .bonus-list-header h2 {
+      font-size: 24px;
+      font-weight: 600;
+      color: #fff;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      text-shadow: 0 0 10px rgba(147, 70, 255, 0.8);
+    }
+
+    .carousel-container {
+      background: linear-gradient(135deg, rgba(26, 27, 46, 0.95), rgba(22, 33, 62, 0.95));
+      border: 2px solid rgba(147, 70, 255, 0.5);
+      border-top: none;
+      border-radius: 0 0 12px 12px;
+      padding: 20px;
+      position: relative;
+      max-height: 800px;
+      overflow: hidden;
+    }
+
+    .gradient-overlay-top,
+    .gradient-overlay-bottom {
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 40px;
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    .gradient-overlay-top {
+      top: 0;
+      background: linear-gradient(to bottom, rgba(26, 27, 46, 0.95), transparent);
+    }
+
+    .gradient-overlay-bottom {
+      bottom: 0;
+      background: linear-gradient(to top, rgba(26, 27, 46, 0.95), transparent);
+    }
+
+    .bonus-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      padding: 10px 5px;
+    }
+
+    .bonus-list.carousel-active {
+      animation: scrollUp linear infinite;
+    }
+
+    @keyframes scrollUp {
+      0% {
+        transform: translateY(0);
+      }
+      100% {
+        transform: translateY(-33.333%);
+      }
+    }
+
+    .bonus-item {
+      background: linear-gradient(135deg, rgba(147, 70, 255, 0.15), rgba(0, 225, 255, 0.15));
+      border: 2px solid rgba(147, 70, 255, 0.4);
+      border-radius: 12px;
+      padding: 15px;
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      transition: all 0.3s ease;
+      min-height: 100px;
+    }
+
+    .bonus-item.super-slot {
+      border: 2px solid #ffd700;
+      box-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+      animation: superGlow 2s ease-in-out infinite;
+    }
+
+    @keyframes superGlow {
+      0%, 100% {
+        box-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+      }
+      50% {
+        box-shadow: 0 0 30px rgba(255, 215, 0, 0.8);
+      }
+    }
+
+    .bonus-slot-image {
+      width: 80px;
+      height: 80px;
+      object-fit: cover;
+      border-radius: 8px;
+      border: 2px solid rgba(147, 70, 255, 0.5);
+      flex-shrink: 0;
+    }
+
+    .bonus-info-section {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .bonus-slot-name {
+      font-size: 18px;
+      font-weight: 600;
+      color: #fff;
+      text-shadow: 0 0 5px rgba(147, 70, 255, 0.5);
+    }
+
+    .bonus-metrics {
+      display: flex;
+      gap: 15px;
+    }
+
+    .metric-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .metric-value {
+      font-size: 16px;
+      font-weight: 600;
+      color: #00e1ff;
+    }
+
+    .metric-value.completed {
+      color: #10b981;
+    }
+
+    .metric-value.pending {
+      color: #6b7280;
+    }
+
+    .metric-label {
+      font-size: 11px;
+      color: #9ca3af;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: #6b7280;
+    }
+
+    .empty-state-icon {
+      font-size: 64px;
+      margin-bottom: 20px;
+      opacity: 0.5;
+    }
+
+    .empty-state-text {
+      font-size: 20px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .empty-state-subtext {
+      font-size: 14px;
+      opacity: 0.7;
+    }
+  </style>
+</head>
+<body>
+  <div class="bonus-list-container">
+    <div class="bonus-list-header">
+      <h2>🎰 Bonus List</h2>
+    </div>
+    <div class="carousel-container">
+      <div class="gradient-overlay-top"></div>
+      <ul class="bonus-list" id="bonus-list">
+        <div class="empty-state" id="empty-state">
+          <div class="empty-state-icon">🎰</div>
+          <div class="empty-state-text">No bonuses yet</div>
+          <div class="empty-state-subtext">Waiting for bonuses from main window...</div>
+        </div>
+      </ul>
+      <div class="gradient-overlay-bottom"></div>
+    </div>
+  </div>
+
+  <script>
+    // Listen for bonus list updates from localStorage
+    function loadBonuses() {
+      try {
+        const savedData = localStorage.getItem('bonusHuntData');
+        if (savedData) {
+          const data = JSON.parse(savedData);
+          return data.bonuses || [];
+        }
+      } catch (e) {
+        console.error('Error loading bonuses:', e);
+      }
+      return [];
+    }
+
+    function getSlotImage(slotName) {
+      const defaultImage = 'https://i.imgur.com/8E3ucNx.png';
+      
+      // First check if there's a custom image URL
+      try {
+        const savedImages = localStorage.getItem('customSlotImages');
+        if (savedImages) {
+          const images = JSON.parse(savedImages);
+          if (images[slotName.toLowerCase()]) {
+            return images[slotName.toLowerCase()];
+          }
+        }
+      } catch (e) {
+        console.error('Error loading custom images:', e);
+      }
+      
+      // Then check the slot database
+      if (typeof window.slotDatabase !== 'undefined' && window.slotDatabase && window.slotDatabase.length > 0) {
+        const slot = window.slotDatabase.find(s => s.name.toLowerCase() === slotName.toLowerCase());
+        if (slot && slot.image) {
+          return slot.image;
+        }
+      }
+      
+      return defaultImage;
+    }
+
+    function renderBonusList(bonuses) {
+      const bonusListEl = document.getElementById('bonus-list');
+      const emptyStateEl = document.getElementById('empty-state');
+      
+      if (!bonuses || bonuses.length === 0) {
+        emptyStateEl.style.display = 'block';
+        bonusListEl.classList.remove('carousel-active');
+        return;
+      }
+      
+      emptyStateEl.style.display = 'none';
+      bonusListEl.innerHTML = '';
+
+      bonuses.forEach(bonus => {
+        const li = document.createElement('li');
+        li.className = `bonus-item${bonus.isSuper ? ' super-slot' : ''}`;
+        
+        const slotImage = getSlotImage(bonus.slot);
+        
+        li.innerHTML = `
+          <img src="${slotImage}" alt="${bonus.slot}" class="bonus-slot-image">
+          <div class="bonus-info-section">
+            <div class="bonus-slot-name">${bonus.slot}</div>
+            <div class="bonus-metrics">
+              <div class="metric-item">
+                <div class="metric-value">€${bonus.bet.toFixed(2)}</div>
+                <div class="metric-label">BET</div>
+              </div>
+              <div class="metric-item">
+                <div class="metric-value ${bonus.payout !== null ? 'completed' : 'pending'}">
+                  ${bonus.payout !== null ? '€' + bonus.payout.toFixed(2) : '--'}
+                </div>
+                <div class="metric-label">WIN</div>
+              </div>
+              <div class="metric-item">
+                <div class="metric-value">${bonus.multiplier.toFixed(2)}x</div>
+                <div class="metric-label">MULT</div>
+              </div>
+            </div>
+          </div>
+        `;
+        
+        bonusListEl.appendChild(li);
+      });
+
+      // Setup carousel if more than 2 items
+      if (bonuses.length > 2) {
+        const originalItems = Array.from(bonusListEl.querySelectorAll('.bonus-item'));
+        
+        // Clone all items twice for seamless infinite loop
+        for (let i = 0; i < 2; i++) {
+          originalItems.forEach(item => {
+            const clone = item.cloneNode(true);
+            bonusListEl.appendChild(clone);
+          });
+        }
+        
+        bonusListEl.classList.add('carousel-active');
+        
+        // Calculate animation duration based on number of items
+        const duration = bonuses.length * 3; // 3 seconds per item
+        bonusListEl.style.animationDuration = `${duration}s`;
+      } else {
+        bonusListEl.classList.remove('carousel-active');
+      }
+    }
+
+    // Keep track of last data to detect changes
+    let lastDataString = '';
+
+    function updateIfChanged() {
+      const currentDataString = localStorage.getItem('bonusHuntData') || '';
+      if (currentDataString !== lastDataString) {
+        lastDataString = currentDataString;
+        renderBonusList(loadBonuses());
+      }
+    }
+
+    // Initial load
+    renderBonusList(loadBonuses());
+    lastDataString = localStorage.getItem('bonusHuntData') || '';
+
+    // Poll for updates every 500ms
+    setInterval(() => {
+      updateIfChanged();
+    }, 500);
+
+    // Auto refresh page every 15 seconds
+    setInterval(() => {
+      location.reload();
+    }, 15000);
+
+    // Also listen for storage events (when updated from another window)
+    window.addEventListener('storage', (e) => {
+      if (e.key === 'bonusHuntData') {
+        updateIfChanged();
+      }
+    });
+  </script>
+</body>
+</html>
