@@ -99,6 +99,7 @@ class BonusHuntManager {
         }
       });
     }
+
   }
 
   handleSlotNameInput() {
@@ -221,6 +222,9 @@ class BonusHuntManager {
       // Remove custom image if URL is empty
       delete this.customSlotImages[slotName.toLowerCase()];
     }
+    
+    // Save custom images to localStorage
+    this.saveBonuses();
     
     // Hide the input row
     if (slotImgUrlRow) {
@@ -616,7 +620,21 @@ class BonusHuntManager {
   }
 
   saveBonuses() {
-    // Disabled - bonuses are not saved to localStorage anymore
+    // Save bonuses to localStorage for the overlay page to access
+    try {
+      const data = {
+        bonuses: this.bonuses,
+        totalBet: this.totalBet,
+        totalPayout: this.totalPayout,
+        timestamp: new Date().toISOString()
+      };
+      localStorage.setItem('bonusHuntData', JSON.stringify(data));
+      
+      // Also save custom slot images
+      localStorage.setItem('customSlotImages', JSON.stringify(this.customSlotImages));
+    } catch (error) {
+      console.error('Error saving bonuses:', error);
+    }
   }
 
   loadSavedBonuses() {
@@ -631,6 +649,8 @@ class BonusHuntManager {
       }
     }
   }
+
+
 
   showFeedback(message, type = 'info') {
     // Create or update feedback display
