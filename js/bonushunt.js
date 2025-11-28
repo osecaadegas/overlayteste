@@ -6,6 +6,7 @@ class BonusHuntManager {
     this.totalBet = 0;
     this.totalPayout = 0;
     this.customSlotImages = {}; // Store custom image URLs
+    this.currentBonusOpeningIndex = 0; // Track current bonus in opening panel
     this.init();
   }
 
@@ -73,6 +74,27 @@ class BonusHuntManager {
       closeBonusOpeningBtn.addEventListener('click', () => this.hideBonusOpeningPanel());
     }
 
+    // Keyboard navigation for bonus opening panel
+    document.addEventListener('keydown', (e) => {
+      const bonusOpeningPanel = document.getElementById('bonus-opening-panel');
+      if (bonusOpeningPanel && bonusOpeningPanel.style.display !== 'none') {
+        if (e.key === 'ArrowLeft') {
+          e.preventDefault();
+          this.navigateToPreviousBonus();
+        } else if (e.key === 'ArrowRight') {
+          e.preventDefault();
+          this.navigateToNextBonus();
+        } else if (e.key === 'Escape') {
+          e.preventDefault();
+          this.hideBonusOpeningPanel();
+        } else if (e.key === 'Enter') {
+          e.preventDefault();
+          // Move to next bonus after entering payout
+          this.navigateToNextBonus();
+        }
+      }
+    });
+
     // Start money and stop money inputs for stats bar
     const startMoneyInput = document.getElementById('start-money-input');
     const stopMoneyInput = document.getElementById('stop-money-input');
@@ -81,6 +103,12 @@ class BonusHuntManager {
     }
     if (stopMoneyInput) {
       stopMoneyInput.addEventListener('input', () => this.updateStatsBar());
+    }
+
+    // Actual balance input
+    const actualBalanceInput = document.getElementById('actual-balance-input');
+    if (actualBalanceInput) {
+      actualBalanceInput.addEventListener('input', () => this.updateStatsBar());
     }
 
     // Slot image URL button
@@ -98,6 +126,12 @@ class BonusHuntManager {
           this.saveCustomSlotImage();
         }
       });
+    }
+
+    // Add slot button (+Slot button)
+    const addSlotBtn = document.getElementById('add-slot-btn');
+    if (addSlotBtn) {
+      addSlotBtn.addEventListener('click', () => this.addBonus());
     }
 
   }
@@ -411,9 +445,13 @@ class BonusHuntManager {
       return;
     }
 
+    // Reset to first bonus when opening panel
+    this.currentBonusOpeningIndex = 0;
+
     if (middlePanel) middlePanel.style.display = 'none';
     if (bonusOpeningPanel) {
       bonusOpeningPanel.style.display = 'flex';
+      this.makeBonusOpeningPanelDraggable(bonusOpeningPanel);
       this.renderBonusOpeningList();
     }
   }
@@ -430,41 +468,172 @@ class BonusHuntManager {
     const bonusOpeningList = document.getElementById('bonus-opening-list');
     if (!bonusOpeningList) return;
 
-    bonusOpeningList.innerHTML = '';
+    // Ensure current index is valid
+    if (this.currentBonusOpeningIndex >= this.bonuses.length) {
+      this.currentBonusOpeningIndex = 0;
+    }
 
-    this.bonuses.forEach(bonus => {
-      const bonusItem = document.createElement('div');
-      bonusItem.className = 'bonus-opening-item';
+    if (this.bonuses.length === 0) return;
+
+    const bonus = this.bonuses[this.currentBonusOpeningIndex];
+    const slotImage = this.getSlotImage(bonus.slot);
+    
+    bonusOpeningList.innerHTML = `
+      <div class="bonus-opening-navigation" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding: 0 10px;">
+        <button class="bonus-nav-btn" id="prev-bonus-btn" ${this.bonuses.length <= 1 ? 'style="visibility: hidden;"' : ''} style="background: linear-gradient(135deg, #4f46e5, #7c3aed); border: none; color: white; padding: 6px 12px; border-radius: 6px; font-weight: 600; cursor: pointer; transition: all 0.2s ease; font-size: 14px;">
+          ← Previous
+        </button>
+        <div class="bonus-counter" style="color: #ffffff; font-size: 14px; font-weight: 700; text-shadow: 0 0 10px rgba(255,255,255,0.5);">
+          ${this.currentBonusOpeningIndex + 1} of ${this.bonuses.length}
+        </div>
+        <button class="bonus-nav-btn" id="next-bonus-btn" ${this.bonuses.length <= 1 ? 'style="visibility: hidden;"' : ''} style="background: linear-gradient(135deg, #4f46e5, #7c3aed); border: none; color: white; padding: 6px 12px; border-radius: 6px; font-weight: 600; cursor: pointer; transition: all 0.2s ease; font-size: 14px;">
+          Next →
+        </button>
+      </div>
       
-      const slotImage = this.getSlotImage(bonus.slot);
-      
-      bonusItem.innerHTML = `
-        <div class="bonus-opening-header">
-          <img src="${slotImage}" alt="${bonus.slot}" class="bonus-opening-image">
-          <div class="bonus-opening-info">
-            <div class="bonus-opening-name">${bonus.slot}</div>
-            <div class="bonus-opening-bet">Bet: €${bonus.bet.toFixed(2)}</div>
+      <div class="bonus-opening-item" style="display: flex; flex-direction: column; align-items: center; gap: 12px;">
+        <div class="bonus-slot-display" style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
+          <img src="${slotImage}" alt="${bonus.slot}" style="width: 80px; height: 80px; object-fit: cover; border-radius: 8px; border: 2px solid #ffd700; box-shadow: 0 0 15px rgba(255, 215, 0, 0.4);">
+          <div style="text-align: center;">
+            <div style="font-size: 16px; font-weight: 700; color: #ffffff; margin-bottom: 2px;">${bonus.slot}</div>
+            <div style="font-size: 13px; color: #00e1ff; font-weight: 600;">Bet: €${bonus.bet.toFixed(2)}</div>
           </div>
         </div>
-        <div class="bonus-opening-payout">
-          <label>Payout Amount:</label>
+        <div class="payout-input-section" style="display: flex; align-items: center; gap: 8px;">
           <input type="number" 
                  class="payout-input" 
                  placeholder="Enter payout" 
                  value="${bonus.payout !== null ? bonus.payout : ''}"
                  min="0" 
                  step="0.01"
-                 data-bonus-id="${bonus.id}">
+                 data-bonus-id="${bonus.id}"
+                 style="width: 160px; padding: 8px 12px; font-size: 16px; font-weight: 600; background: rgba(255,255,255,0.1); border: 2px solid #00e1ff; border-radius: 6px; color: #ffffff; text-align: center;">
+          <span style="color: #9ca3af; font-size: 16px; font-weight: 600;">€</span>
         </div>
-      `;
+      </div>
+    `;
 
-      const payoutInput = bonusItem.querySelector('.payout-input');
+    // Set up navigation event listeners
+    const prevBtn = document.getElementById('prev-bonus-btn');
+    const nextBtn = document.getElementById('next-bonus-btn');
+    
+    if (prevBtn) {
+      prevBtn.addEventListener('click', () => this.navigateToPreviousBonus());
+    }
+    
+    if (nextBtn) {
+      nextBtn.addEventListener('click', () => this.navigateToNextBonus());
+      nextBtn.addEventListener('mouseenter', (e) => {
+        e.target.style.transform = 'translateY(-2px)';
+        e.target.style.boxShadow = '0 4px 12px rgba(79, 70, 229, 0.4)';
+      });
+      nextBtn.addEventListener('mouseleave', (e) => {
+        e.target.style.transform = 'translateY(0)';
+        e.target.style.boxShadow = 'none';
+      });
+    }
+
+    if (prevBtn) {
+      prevBtn.addEventListener('mouseenter', (e) => {
+        e.target.style.transform = 'translateY(-2px)';
+        e.target.style.boxShadow = '0 4px 12px rgba(79, 70, 229, 0.4)';
+      });
+      prevBtn.addEventListener('mouseleave', (e) => {
+        e.target.style.transform = 'translateY(0)';
+        e.target.style.boxShadow = 'none';
+      });
+    }
+
+    // Set up payout input listener
+    const payoutInput = bonusOpeningList.querySelector('.payout-input');
+    if (payoutInput) {
       payoutInput.addEventListener('input', (e) => {
         this.updateBonusPayout(bonus.id, parseFloat(e.target.value) || 0);
       });
+      
+      // Auto-focus and select text for easier input
+      setTimeout(() => {
+        payoutInput.focus();
+        payoutInput.select();
+      }, 100);
+    }
+  }
 
-      bonusOpeningList.appendChild(bonusItem);
-    });
+  navigateToNextBonus() {
+    if (this.bonuses.length <= 1) return;
+    
+    this.currentBonusOpeningIndex = (this.currentBonusOpeningIndex + 1) % this.bonuses.length;
+    this.renderBonusOpeningList();
+  }
+
+  navigateToPreviousBonus() {
+    if (this.bonuses.length <= 1) return;
+    
+    this.currentBonusOpeningIndex = this.currentBonusOpeningIndex === 0 
+      ? this.bonuses.length - 1 
+      : this.currentBonusOpeningIndex - 1;
+    this.renderBonusOpeningList();
+  }
+
+  makeBonusOpeningPanelDraggable(panel) {
+    let isDragging = false;
+    let startX, startY, initialX, initialY;
+
+    // Add drag cursor to the panel header
+    const panelTitle = panel.querySelector('.middle-panel-title');
+    if (panelTitle) {
+      panelTitle.style.cursor = 'move';
+      panelTitle.style.userSelect = 'none';
+    }
+
+    const handleMouseDown = (e) => {
+      // Only allow dragging from the title bar
+      if (!e.target.classList.contains('middle-panel-title')) return;
+      
+      isDragging = true;
+      startX = e.clientX;
+      startY = e.clientY;
+      
+      const rect = panel.getBoundingClientRect();
+      initialX = rect.left;
+      initialY = rect.top;
+      
+      panel.style.position = 'fixed';
+      panel.style.left = initialX + 'px';
+      panel.style.top = initialY + 'px';
+      panel.style.transform = 'none';
+      panel.style.zIndex = '9999';
+      
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      
+      e.preventDefault();
+    };
+
+    const handleMouseMove = (e) => {
+      if (!isDragging) return;
+      
+      const deltaX = e.clientX - startX;
+      const deltaY = e.clientY - startY;
+      
+      const newX = initialX + deltaX;
+      const newY = initialY + deltaY;
+      
+      // Keep within screen bounds
+      const maxX = window.innerWidth - panel.offsetWidth;
+      const maxY = window.innerHeight - panel.offsetHeight;
+      
+      panel.style.left = Math.max(0, Math.min(newX, maxX)) + 'px';
+      panel.style.top = Math.max(0, Math.min(newY, maxY)) + 'px';
+    };
+
+    const handleMouseUp = () => {
+      isDragging = false;
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    panel.addEventListener('mousedown', handleMouseDown);
   }
 
   updateBonusPayout(bonusId, payout) {
@@ -504,24 +673,58 @@ class BonusHuntManager {
 
     // Update stats bar
     this.updateStatsBar();
+    
+    // Trigger calculator update if available
+    if (window.bonusHuntUI) {
+      window.bonusHuntUI.onBonusDataChanged();
+    }
   }
 
   updateStatsBar() {
     const startMoneyInput = document.getElementById('start-money-input');
     const stopMoneyInput = document.getElementById('stop-money-input');
-    const startValue = document.getElementById('bh-start-value');
-    const targetValue = document.getElementById('bh-target-value');
-    const worstValue = document.getElementById('bh-worst-value');
-    const avgXValue = document.getElementById('bh-avgx-value');
-    const reqXValue = document.getElementById('bh-reqx-value');
-    const bestSlotIcon = document.getElementById('bh-best-slot-icon');
-    const worstSlotIcon = document.getElementById('bh-worst-slot-icon');
-
-    if (!startValue || !targetValue || !avgXValue || !reqXValue) return;
+    const actualBalanceInput = document.getElementById('actual-balance-input');
+    const totalSpentInput = document.getElementById('total-spent-input');
+    
+    // Update new stats panel
+    const statStart = document.getElementById('bh-stat-start');
+    const statTarget = document.getElementById('bh-stat-target');
+    const statCurrent = document.getElementById('bh-stat-current');
+    const statSpent = document.getElementById('bh-stat-spent');
+    const statProfit = document.getElementById('bh-stat-profit');
+    const statBest = document.getElementById('bh-stat-best');
+    const statBestValue = document.getElementById('bh-stat-best-value');
+    const statWorst = document.getElementById('bh-stat-worst');
+    const statWorstValue = document.getElementById('bh-stat-worst-value');
+    const statCount = document.getElementById('bh-stat-count');
+    const statAvgX = document.getElementById('bh-stat-avgx');
+    const statReqX = document.getElementById('bh-stat-reqx');
 
     // START: Current money from start money input
     const startMoney = startMoneyInput ? parseFloat(startMoneyInput.value) || 0 : 0;
-    startValue.textContent = `€${startMoney.toFixed(2)}`;
+    const stopMoney = stopMoneyInput ? parseFloat(stopMoneyInput.value) || 0 : 0;
+    const actualBalance = actualBalanceInput ? parseFloat(actualBalanceInput.value) || 0 : 0;
+    
+    if (statStart) statStart.textContent = `€${startMoney.toFixed(2)}`;
+    if (statTarget) statTarget.textContent = `€${stopMoney.toFixed(2)}`;
+    
+    // Total spent (start money - actual balance)
+    const totalSpent = startMoney - actualBalance;
+    if (totalSpentInput) totalSpentInput.value = totalSpent.toFixed(2);
+    if (statSpent) statSpent.textContent = `€${totalSpent.toFixed(2)}`;
+    
+    // Current balance from input
+    if (statCurrent) statCurrent.textContent = `€${actualBalance.toFixed(2)}`;
+    
+    // Profit/Loss (actual balance + total payout - start money)
+    const profit = actualBalance + this.totalPayout - startMoney;
+    if (statProfit) {
+      statProfit.textContent = `€${profit.toFixed(2)}`;
+      statProfit.style.color = profit >= 0 ? '#00ffb8' : '#ff5c5c';
+    }
+    
+    // Total bonuses count
+    if (statCount) statCount.textContent = this.bonuses.length.toString();
 
     // BEST & WORST: Highest and lowest paying slots
     if (this.bonuses.length > 0) {
@@ -531,14 +734,11 @@ class BonusHuntManager {
       });
       
       if (bestBonus.payout && bestBonus.payout > 0) {
-        const bestSlotImage = this.getSlotImage(bestBonus.slotName);
-        if (bestSlotImage && bestSlotIcon) {
-          bestSlotIcon.innerHTML = `<img src="${bestSlotImage}" alt="${bestBonus.slotName}" style="width: 32px; height: 32px; border-radius: 6px;">`;
-        }
-        targetValue.textContent = bestBonus.slotName.length > 12 ? bestBonus.slotName.substring(0, 12) + '...' : bestBonus.slotName;
+        if (statBest) statBest.textContent = bestBonus.slotName;
+        if (statBestValue) statBestValue.textContent = `€${bestBonus.payout.toFixed(2)}`;
       } else {
-        if (bestSlotIcon) bestSlotIcon.innerHTML = '🎰';
-        targetValue.textContent = '--';
+        if (statBest) statBest.textContent = '--';
+        if (statBestValue) statBestValue.textContent = '€0.00';
       }
 
       // Find worst bonus (only among opened bonuses with payout > 0)
@@ -548,31 +748,26 @@ class BonusHuntManager {
           return (bonus.payout || 0) < (worst.payout || 0) ? bonus : worst;
         });
         
-        const worstSlotImage = this.getSlotImage(worstBonus.slotName);
-        if (worstSlotImage && worstSlotIcon) {
-          worstSlotIcon.innerHTML = `<img src="${worstSlotImage}" alt="${worstBonus.slotName}" style="width: 32px; height: 32px; border-radius: 6px;">`;
-        }
-        if (worstValue) {
-          worstValue.textContent = worstBonus.slotName.length > 12 ? worstBonus.slotName.substring(0, 12) + '...' : worstBonus.slotName;
-        }
+        if (statWorst) statWorst.textContent = worstBonus.slotName;
+        if (statWorstValue) statWorstValue.textContent = `€${worstBonus.payout.toFixed(2)}`;
       } else {
-        if (worstSlotIcon) worstSlotIcon.innerHTML = '💀';
-        if (worstValue) worstValue.textContent = '--';
+        if (statWorst) statWorst.textContent = '--';
+        if (statWorstValue) statWorstValue.textContent = '€0.00';
       }
     } else {
-      if (bestSlotIcon) bestSlotIcon.innerHTML = '🎰';
-      targetValue.textContent = '--';
-      if (worstSlotIcon) worstSlotIcon.innerHTML = '💀';
-      if (worstValue) worstValue.textContent = '--';
+      if (statBest) statBest.textContent = '--';
+      if (statBestValue) statBestValue.textContent = '€0.00';
+      if (statWorst) statWorst.textContent = '--';
+      if (statWorstValue) statWorstValue.textContent = '€0.00';
     }
 
     // AVG X: Average multiplier (total payout / total bet)
     const avgX = this.totalBet > 0 ? (this.totalPayout / this.totalBet) : 0;
-    avgXValue.textContent = `${avgX.toFixed(2)}X`;
+    if (statAvgX) statAvgX.textContent = `${avgX.toFixed(2)}x`;
 
-    // REQ X: Required multiplier to break even (1.0 if avgX < 1, otherwise 0)
-    const reqX = avgX < 1 ? (1.0 - avgX) : 0;
-    reqXValue.textContent = `${reqX.toFixed(2)}X`;
+    // REQ X: Required multiplier to break even
+    const reqX = this.totalBet > 0 ? (this.totalBet / (this.totalBet - this.totalPayout + this.totalBet)) : 0;
+    if (statReqX) statReqX.textContent = `${reqX.toFixed(2)}x`;
   }
 
   clearAllBonuses() {

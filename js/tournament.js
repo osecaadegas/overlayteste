@@ -162,7 +162,7 @@ class TournamentManager {
         });
       });
 
-      dropdown.style.display = 'block';
+      dropdown.classList.remove('display-none');
     } else {
       dropdown.style.display = 'none';
     }
@@ -179,7 +179,13 @@ class TournamentManager {
     if (startBtn) {
       const canStart = participants.length >= 2;
       startBtn.disabled = !canStart;
-      startBtn.style.opacity = canStart ? '1' : '0.5';
+      if (canStart) {
+        startBtn.classList.remove('opacity-50');
+        startBtn.classList.add('opacity-100');
+      } else {
+        startBtn.classList.remove('opacity-100');
+        startBtn.classList.add('opacity-50');
+      }
     }
   }
 
@@ -350,8 +356,23 @@ class TournamentManager {
     }
     
     const bracket = document.getElementById('tournament-bracket');
-    if (bracket) {
-      bracket.style.display = 'block';
+    const leftPanel = document.getElementById('tournament-left-panel');
+    
+    if (bracket && leftPanel) {
+      bracket.classList.remove('display-none');
+      leftPanel.classList.add('display-flex');
+      
+      // Restore saved position preference
+      const savedPosition = localStorage.getItem('tournamentBracketPosition') || 'center-right';
+      leftPanel.classList.remove('pos-upper-right', 'pos-lower-right', 'pos-upper-left', 'pos-lower-left', 'pos-center-right');
+      leftPanel.classList.add(`pos-${savedPosition}`);
+      
+      // Make panels draggable
+      if (window.dragHandler) {
+        window.dragHandler.makeDraggable(leftPanel);
+        window.dragHandler.makeDraggable(bracket);
+      }
+      
       this.hideOtherSections();
       this.renderBracketHTML();
     }
@@ -363,12 +384,18 @@ class TournamentManager {
     const discordSection = document.querySelector('.info-section.discord');
     const moneyRowMain = document.querySelector('.money-row-main');
     const statsBar = document.querySelector('.bh-stats-bar');
+    const infoPanel = document.querySelector('.info-panel');
     
-    if (bonusHuntResults) bonusHuntResults.style.display = 'none';
-    if (bonusList) bonusList.style.display = 'none';
-    if (discordSection) discordSection.style.display = 'none';
-    if (moneyRowMain) moneyRowMain.style.display = 'none';
-    if (statsBar) statsBar.style.display = 'none';
+    if (bonusHuntResults) bonusHuntResults.classList.add('display-none');
+    if (bonusList) bonusList.classList.add('display-none');
+    if (discordSection) discordSection.classList.add('display-none');
+    if (moneyRowMain) moneyRowMain.classList.add('display-none');
+    if (statsBar) statsBar.classList.add('display-none');
+    
+    // Hide info panel during tournament
+    if (infoPanel) {
+      infoPanel.classList.remove('info-panel--visible');
+    }
   }
 
   renderBracketHTML() {
@@ -434,6 +461,13 @@ class TournamentManager {
     
     bracketContent.innerHTML = bracketHTML;
     console.log('Bracket rendered with', sortedMatches.length, 'matches');
+    
+    // Apply theme-based styling to newly rendered bracket cards
+    setTimeout(() => {
+      if (window.refreshTournamentBracketStyling) {
+        window.refreshTournamentBracketStyling();
+      }
+    }, 50);
   }
 
   displayTournamentControl() {
@@ -521,7 +555,7 @@ class TournamentManager {
 
     if (currentPhase === 'Final') {
       advanceBtn.textContent = '🏆 Tournament Complete!';
-      advanceBtn.style.display = 'none'; // Hide for final since it auto-completes
+      advanceBtn.classList.add('display-none'); // Hide for final since it auto-completes
     } else if (hasMoreMatches) {
       advanceBtn.textContent = '➡️ Next Match';
     } else if (currentPhase === 'Semi-Finals') {
@@ -988,6 +1022,13 @@ class TournamentManager {
           </div>
         </div>
       `;
+      
+      // Apply theme-based styling to newly rendered content
+      setTimeout(() => {
+        if (window.refreshTournamentBracketStyling) {
+          window.refreshTournamentBracketStyling();
+        }
+      }, 50);
     }
     
     // Hide control panel and show celebration
@@ -1061,11 +1102,13 @@ class TournamentManager {
     const controlPanel = document.getElementById('tournament-control-panel');
     const tournamentPanel = document.getElementById('tournament-panel');
     const bracket = document.getElementById('tournament-bracket');
+    const leftPanel = document.getElementById('tournament-left-panel');
     const statsBar = document.querySelector('.bh-stats-bar');
     
     if (controlPanel) controlPanel.style.display = 'none';
     if (tournamentPanel) tournamentPanel.style.display = 'none';
     if (bracket) bracket.style.display = 'none';
+    if (leftPanel) leftPanel.style.display = 'none';
     if (statsBar) statsBar.style.display = 'flex';
     
     this.state.isActive = false;
@@ -1085,20 +1128,22 @@ class TournamentManager {
 
     button.innerHTML = message;
     
+    button.classList.remove('tournament-feedback-success', 'tournament-feedback-error', 'tournament-feedback-info');
+    
     switch (type) {
       case 'success':
-        button.style.background = 'linear-gradient(135deg, #00ff88 0%, #00cc6a 100%)';
+        button.classList.add('tournament-feedback-success');
         break;
       case 'error':
-        button.style.background = 'linear-gradient(135deg, #ff6b6b 0%, #ff8e53 100%)';
+        button.classList.add('tournament-feedback-error');
         break;
       default:
-        button.style.background = 'linear-gradient(135deg, #00e1ff 0%, #9147ff 100%)';
+        button.classList.add('tournament-feedback-info');
     }
 
     setTimeout(() => {
       button.innerHTML = originalContent;
-      button.style.background = originalStyle;
+      button.classList.remove('tournament-feedback-success', 'tournament-feedback-error', 'tournament-feedback-info');
     }, 3000);
   }
 

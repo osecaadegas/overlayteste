@@ -50,8 +50,7 @@ function makePanelInteractive(panel) {
   // Add drag handle to panel title
   const title = panel.querySelector('.middle-panel-title, .tournament-control-header, .customization-header');
   if (title) {
-    title.style.cursor = 'move';
-    title.style.userSelect = 'none';
+    title.classList.add('draggable-title');
     
     let isDragging = false;
     let offsetX, offsetY;
@@ -70,8 +69,7 @@ function makePanelInteractive(panel) {
       if (isDragging && !window.isLayoutLocked) {
         panel.style.left = (e.clientX - offsetX) + 'px';
         panel.style.top = (e.clientY - offsetY) + 'px';
-        panel.style.transform = 'none';
-        panel.style.margin = '0';
+        panel.classList.add('panel-dragging');
       }
     });
 
@@ -83,18 +81,7 @@ function makePanelInteractive(panel) {
   // Add resize handle
   const resizeHandle = document.createElement('div');
   resizeHandle.className = 'resize-handle';
-  resizeHandle.style.cssText = `
-    position: absolute;
-    bottom: 0;
-    right: 0;
-    width: 20px;
-    height: 20px;
-    cursor: nwse-resize;
-    background: linear-gradient(135deg, transparent 50%, rgba(255, 215, 0, 0.5) 50%);
-    border-bottom-right-radius: 8px;
-  `;
-  panel.style.position = 'fixed';
-  panel.style.resize = 'none';
+  panel.classList.add('panel-fixed');
   panel.appendChild(resizeHandle);
 
   let isResizing = false;
@@ -172,44 +159,35 @@ const StorageHelper = {
 // Animation helpers
 const AnimationHelper = {
   fadeIn(element, duration = 300) {
-    element.style.opacity = '0';
     element.style.display = 'block';
+    element.classList.remove('fade-out', 'fade-out-slow');
     
-    let start = null;
-    function animate(timestamp) {
-      if (!start) start = timestamp;
-      const progress = timestamp - start;
-      const opacity = Math.min(progress / duration, 1);
-      
-      element.style.opacity = opacity;
-      
-      if (progress < duration) {
-        requestAnimationFrame(animate);
-      }
+    if (duration > 400) {
+      element.classList.add('fade-in-slow');
+    } else {
+      element.classList.add('fade-in');
     }
     
-    requestAnimationFrame(animate);
+    // Remove the animation class after animation completes
+    setTimeout(() => {
+      element.classList.remove('fade-in', 'fade-in-slow');
+    }, duration);
   },
 
   fadeOut(element, duration = 300) {
-    let start = null;
-    const initialOpacity = parseFloat(getComputedStyle(element).opacity);
+    element.classList.remove('fade-in', 'fade-in-slow');
     
-    function animate(timestamp) {
-      if (!start) start = timestamp;
-      const progress = timestamp - start;
-      const opacity = Math.max(initialOpacity - (progress / duration), 0);
-      
-      element.style.opacity = opacity;
-      
-      if (progress < duration) {
-        requestAnimationFrame(animate);
-      } else {
-        element.style.display = 'none';
-      }
+    if (duration > 400) {
+      element.classList.add('fade-out-slow');
+    } else {
+      element.classList.add('fade-out');
     }
     
-    requestAnimationFrame(animate);
+    // Hide the element after animation completes
+    setTimeout(() => {
+      element.style.display = 'none';
+      element.classList.remove('fade-out', 'fade-out-slow');
+    }, duration);
   },
 
   slideUp(element, duration = 300) {
@@ -447,7 +425,7 @@ const CustomizationManager = {
   setupEventListeners() {
     // All color pickers
     const allColorInputs = [
-      'primary-color', 'accent-color', 'background-color', 'text-color',
+      'primary-color', 'accent-color', 'background-color', 'text-color', 'card-background-color',
       'streamer-name-color', 'website-color', 'gamble-aware-color',
       'slot-title-color', 'slot-bet-color', 'slot-win-color', 
       'bonus-header-color', 'money-display-color',
@@ -456,14 +434,18 @@ const CustomizationManager = {
       'sidebar-gradient-start', 'sidebar-gradient-end'
     ];
 
-    allColorInputs.forEach(id => {
+      allColorInputs.forEach(id => {
       const input = document.getElementById(id);
       if (input) {
-        input.addEventListener('input', () => this.applyAllColors());
+        input.addEventListener('input', () => {
+          this.applyAllColors();
+          // Also refresh tournament bracket styling if it exists
+          if (window.refreshTournamentBracketStyling) {
+            setTimeout(window.refreshTournamentBracketStyling, 50);
+          }
+        });
       }
-    });
-
-    // Gradient direction
+    });    // Gradient direction
     const gradientDirection = document.getElementById('gradient-direction');
     if (gradientDirection) {
       gradientDirection.addEventListener('change', () => this.applyAllColors());
@@ -474,7 +456,8 @@ const CustomizationManager = {
       'glass-effect-toggle',
       'animated-gradients-toggle',
       'glow-effects-toggle',
-      'sidebar-backgrounds-toggle'
+      'sidebar-backgrounds-toggle',
+      'hide-chat-toggle'
     ];
 
     effectToggles.forEach(id => {
@@ -521,6 +504,34 @@ const CustomizationManager = {
     
     if (resetLogoBtn) {
       resetLogoBtn.addEventListener('click', () => this.resetLogo());
+    }
+
+    // Sidebar position
+    const sidebarPosition = document.getElementById('sidebar-position');
+    if (sidebarPosition) {
+      sidebarPosition.addEventListener('change', () => this.applySidebarPosition());
+    }
+
+    // Tournament bracket layout
+    const tournamentLayout = document.getElementById('tournament-bracket-layout');
+    if (tournamentLayout) {
+      tournamentLayout.addEventListener('change', () => this.applyTournamentLayout());
+    }
+
+    // Info panel position
+    const infoPanelPosition = document.getElementById('info-panel-position');
+    if (infoPanelPosition) {
+      infoPanelPosition.addEventListener('change', () => this.applyInfoPanelPosition());
+    }
+
+    const tournamentBracketPosition = document.getElementById('tournament-bracket-position');
+    if (tournamentBracketPosition) {
+      tournamentBracketPosition.addEventListener('change', () => this.applyTournamentBracketPosition());
+    }
+
+    const dragResizeToggle = document.getElementById('enable-drag-resize');
+    if (dragResizeToggle) {
+      dragResizeToggle.addEventListener('change', (e) => this.applyDragResize(e.target.checked));
     }
 
     // Background settings
@@ -642,7 +653,7 @@ const CustomizationManager = {
     const inputs = document.querySelectorAll('input[type="text"], input[type="number"], input[type="url"], select, textarea, .middle-input');
     inputs.forEach(input => {
       input.style.borderColor = accentColor;
-      input.style.background = `rgba(0, 0, 0, 0.3)`;
+      input.classList.add('input-bg-overlay');
       input.style.color = textColor;
     });
 
@@ -667,10 +678,11 @@ const CustomizationManager = {
     });
 
     // 8. TOURNAMENT MATCHES
-    const matches = document.querySelectorAll('.bracket-match-horizontal, .match-participant');
+    const matches = document.querySelectorAll('.bracket-match-horizontal, .match-participant, .bracket-match, .bracket-participant');
     matches.forEach(match => {
       match.style.borderColor = `${accentColor}66`;
-      match.style.background = `rgba(0, 0, 0, 0.3)`;
+      const cardBgRgb = this.hexToRgb(cardBgColor);
+      match.style.background = `rgba(${cardBgRgb.r}, ${cardBgRgb.g}, ${cardBgRgb.b}, 0.8)`;
     });
 
     // 9. NAVBAR
@@ -691,19 +703,36 @@ const CustomizationManager = {
     const streamerNameColor = document.getElementById('streamer-name-color')?.value;
     if (streamerNameColor) {
       const streamerName = document.getElementById('streamer-name');
-      if (streamerName) streamerName.style.color = streamerNameColor;
+      if (streamerName) {
+        streamerName.style.setProperty('background', 'none', 'important');
+        streamerName.style.setProperty('-webkit-background-clip', 'unset', 'important');
+        streamerName.style.setProperty('-webkit-text-fill-color', 'unset', 'important');
+        streamerName.style.setProperty('background-clip', 'unset', 'important');
+        streamerName.style.setProperty('color', streamerNameColor, 'important');
+      }
     }
 
     const websiteColor = document.getElementById('website-color')?.value;
     if (websiteColor) {
       const websiteLink = document.getElementById('website-link');
-      if (websiteLink) websiteLink.style.color = websiteColor;
+      if (websiteLink) {
+        websiteLink.style.setProperty('background', 'none', 'important');
+        websiteLink.style.setProperty('color', websiteColor, 'important');
+      }
     }
 
     const gambleAwareColor = document.getElementById('gamble-aware-color')?.value;
     if (gambleAwareColor) {
-      const gambleAware = document.querySelector('.gamble-aware');
-      if (gambleAware) gambleAware.style.color = gambleAwareColor;
+      const gambleAware = document.querySelector('.aware-link');
+      if (gambleAware) {
+        gambleAware.style.setProperty('background', 'none', 'important');
+        gambleAware.style.setProperty('-webkit-background-clip', 'unset', 'important');
+        gambleAware.style.setProperty('-webkit-text-fill-color', 'unset', 'important');
+        gambleAware.style.setProperty('background-clip', 'unset', 'important');
+        gambleAware.style.setProperty('text-shadow', 'none', 'important');
+        gambleAware.style.setProperty('border', 'none', 'important');
+        gambleAware.style.setProperty('color', gambleAwareColor, 'important');
+      }
     }
 
     const slotTitleColor = document.getElementById('slot-title-color')?.value;
@@ -855,7 +884,7 @@ const CustomizationManager = {
       /* Override inline styles */
       #streamer-name-input,
       #website-input {
-        background: rgba(0,0,0,0.7) !important;
+        background: var(--transparency-overlay) !important;
         color: ${textColor} !important;
         border: 1px solid ${accentColor} !important;
       }
@@ -954,13 +983,183 @@ const CustomizationManager = {
     const animatedGradients = document.getElementById('animated-gradients-toggle')?.checked || false;
     const glowEffects = document.getElementById('glow-effects-toggle')?.checked || false;
     const sidebarBg = document.getElementById('sidebar-backgrounds-toggle')?.checked || false;
+    const hideChat = document.getElementById('hide-chat-toggle')?.checked || false;
 
     document.body.classList.toggle('glass-effect', glassEffect);
     document.body.classList.toggle('animated-gradients', animatedGradients);
     document.body.classList.toggle('glow-effects', glowEffects);
     document.body.classList.toggle('custom-theme', !sidebarBg);
+    
+    // Hide/show chat box (collapse entire chat section in horizontal layout)
+    const chatContainer = document.querySelector('.twitch-chat-container');
+    const chatSection = document.querySelector('.info-twitch-chat');
+    if (chatContainer) chatContainer.style.display = hideChat ? 'none' : 'flex';
+    if (chatSection) chatSection.style.display = hideChat ? 'none' : 'block';
 
     this.saveSettings();
+  },
+
+  applySidebarPosition() {
+    const position = document.getElementById('sidebar-position')?.value || 'right';
+    const infoPanel = document.querySelector('.info-panel');
+    
+    console.log('applySidebarPosition called. Position:', position);
+    console.log('Info panel found:', !!infoPanel);
+    
+    if (infoPanel) {
+      if (position === 'bottom-left') {
+        console.log('Applying bottom-left layout');
+        infoPanel.classList.add('sidebar-bottom-left');
+        infoPanel.classList.remove('sidebar-right');
+      } else {
+        console.log('Applying right sidebar layout');
+        infoPanel.classList.add('sidebar-right');
+        infoPanel.classList.remove('sidebar-bottom-left');
+      }
+      console.log('Current classes:', infoPanel.className);
+    }
+    
+    this.saveSettings();
+  },
+
+  applyTournamentLayout() {
+    const layout = document.getElementById('tournament-bracket-layout')?.value || 'vertical';
+    const tournamentPanel = document.getElementById('tournament-left-panel');
+    
+    if (tournamentPanel) {
+      if (layout === 'horizontal') {
+        tournamentPanel.classList.add('horizontal-layout');
+      } else {
+        tournamentPanel.classList.remove('horizontal-layout');
+      }
+      
+      // Save preference
+      localStorage.setItem('tournamentLayoutHorizontal', layout === 'horizontal');
+      console.log(`Tournament layout changed to: ${layout}`);
+    }
+    
+    this.saveSettings();
+  },
+
+  applyInfoPanelPosition() {
+    const position = document.getElementById('info-panel-position')?.value || 'center-right';
+    const infoPanel = document.querySelector('.info-panel');
+    
+    if (infoPanel) {
+      // Remove any previously applied position classes
+      infoPanel.classList.remove('pos-upper-right', 'pos-lower-right', 'pos-upper-left', 'pos-lower-left', 'pos-center-right');
+      
+      // Apply new position class
+      infoPanel.classList.add(`pos-${position}`);
+      
+      // Save preference
+      localStorage.setItem('infoPanelPosition', position);
+      console.log(`Info panel position changed to: ${position}`);
+    }
+    
+    this.saveSettings();
+  },
+
+  applyTournamentBracketPosition() {
+    const position = document.getElementById('tournament-bracket-position')?.value || 'center-right';
+    const tournamentPanel = document.querySelector('.tournament-left-panel');
+    
+    if (tournamentPanel) {
+      // Remove any previously applied position classes
+      tournamentPanel.classList.remove('pos-upper-right', 'pos-lower-right', 'pos-upper-left', 'pos-lower-left', 'pos-center-right');
+      
+      // Apply new position class
+      tournamentPanel.classList.add(`pos-${position}`);
+      
+      // Save preference
+      localStorage.setItem('tournamentBracketPosition', position);
+      console.log(`Tournament bracket position changed to: ${position}`);
+    }
+    
+    this.saveSettings();
+  },
+
+  applyDragResize(enabled) {
+    const infoPanel = document.querySelector('.info-panel');
+    if (!infoPanel) return;
+
+    // Reset any inline positioning if disabling
+    if (!enabled) {
+      infoPanel.classList.remove('draggable', 'resizable');
+      infoPanel.style.removeProperty('left');
+      infoPanel.style.removeProperty('top');
+      infoPanel.style.removeProperty('width');
+      infoPanel.style.removeProperty('height');
+      // remove visual handle if present
+      const handle = infoPanel.querySelector('.resize-handle');
+      if (handle) handle.remove();
+      this.saveSettings();
+      return;
+    }
+
+    // Enable classes
+    infoPanel.classList.add('draggable', 'resizable');
+
+    // Add a small visual resize hint
+    if (!infoPanel.querySelector('.resize-handle')) {
+      const handle = document.createElement('div');
+      handle.className = 'resize-handle';
+      infoPanel.appendChild(handle);
+    }
+
+    // Basic drag implementation
+    let isDragging = false;
+    let startX = 0, startY = 0, origLeft = 0, origTop = 0;
+
+    const onMouseDown = (e) => {
+      // Only left button
+      if (e.button !== 0) return;
+      isDragging = true;
+      startX = e.clientX;
+      startY = e.clientY;
+      const rect = infoPanel.getBoundingClientRect();
+      origLeft = rect.left;
+      origTop = rect.top;
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
+      e.preventDefault();
+    };
+
+    const clamp = (val, min, max) => Math.min(Math.max(val, min), max);
+
+    const onMouseMove = (e) => {
+      if (!isDragging) return;
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+      const newLeft = origLeft + dx;
+      const newTop = origTop + dy;
+      const maxLeft = window.innerWidth - infoPanel.offsetWidth - 10;
+      const maxTop = window.innerHeight - infoPanel.offsetHeight - 10;
+      infoPanel.style.left = clamp(newLeft, 10, maxLeft) + 'px';
+      infoPanel.style.top = clamp(newTop, 10, maxTop) + 'px';
+      infoPanel.style.position = 'fixed';
+    };
+
+    const onMouseUp = () => {
+      if (!isDragging) return;
+      isDragging = false;
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+      this.saveSettings();
+    };
+
+    // Bind to panel background to avoid interfering with inner controls
+    infoPanel.addEventListener('mousedown', onMouseDown);
+
+    // Persist position and size
+    const rect = infoPanel.getBoundingClientRect();
+    StorageHelper.set('panelLayout', {
+      left: rect.left,
+      top: rect.top,
+      width: rect.width,
+      height: rect.height,
+      enabled: true
+    });
   },
 
   handleLogoUpload(e) {
@@ -1051,7 +1250,19 @@ const CustomizationManager = {
       'radial-neon-pink': 'radial-gradient(circle at 20% 80%, rgba(236, 72, 153, 0.3) 0%, transparent 50%), radial-gradient(circle at 80% 20%, rgba(244, 114, 182, 0.2) 0%, transparent 50%), linear-gradient(135deg, #831843 0%, #9f1239 100%)',
       'stripe-neon-green': 'repeating-linear-gradient(45deg, #064e3b 0px, #064e3b 40px, #065f46 40px, #065f46 80px), radial-gradient(circle at 50% 50%, rgba(16, 185, 129, 0.2) 0%, transparent 70%)',
       'rainbow-gradient': 'linear-gradient(45deg, rgba(236, 72, 153, 0.1) 0%, rgba(139, 92, 246, 0.1) 25%, rgba(6, 182, 212, 0.1) 50%, rgba(16, 185, 129, 0.1) 75%, rgba(249, 115, 22, 0.1) 100%), linear-gradient(180deg, #1e1b4b 0%, #312e81 100%)',
-      'black-sky': 'radial-gradient(ellipse at top, rgba(31, 41, 55, 0.4) 0%, transparent 60%), radial-gradient(ellipse at bottom, rgba(17, 24, 39, 0.3) 0%, transparent 50%), radial-gradient(circle at 20% 20%, rgba(75, 85, 99, 0.1) 0%, transparent 30%), radial-gradient(circle at 80% 80%, rgba(55, 65, 81, 0.1) 0%, transparent 30%), linear-gradient(180deg, #000000 0%, #050505 50%, #000000 100%)'
+      'black-sky': '#0a0a0a',
+      'animated-waves': 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      'particle-field': '#0f0f23',
+      'matrix-rain': '#000000',
+      'cyber-grid': 'linear-gradient(0deg, rgba(0, 255, 255, 0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(0, 255, 255, 0.03) 1px, transparent 1px), #0a0a0a',
+      'plasma-wave': 'linear-gradient(45deg, #ee7752, #e73c7e, #23a6d5, #23d5ab)',
+      'hexagon-pattern': 'radial-gradient(circle at 25% 25%, rgba(147, 51, 234, 0.2) 0%, transparent 50%), radial-gradient(circle at 75% 75%, rgba(59, 130, 246, 0.2) 0%, transparent 50%), repeating-linear-gradient(60deg, transparent, transparent 35px, rgba(147, 51, 234, 0.1) 35px, rgba(147, 51, 234, 0.1) 70px), repeating-linear-gradient(120deg, transparent, transparent 35px, rgba(59, 130, 246, 0.1) 35px, rgba(59, 130, 246, 0.1) 70px), #0f0f1e',
+      'constellation': 'radial-gradient(2px 2px at 20% 30%, white, transparent), radial-gradient(2px 2px at 60% 70%, white, transparent), radial-gradient(1px 1px at 50% 50%, white, transparent), radial-gradient(1px 1px at 80% 10%, white, transparent), radial-gradient(2px 2px at 90% 60%, white, transparent), radial-gradient(1px 1px at 33% 90%, white, transparent), radial-gradient(1px 1px at 15% 80%, white, transparent), radial-gradient(2px 2px at 70% 25%, white, transparent), #000000',
+      'northern-lights': 'linear-gradient(180deg, #0a1628 0%, #1a2f4f 25%, #2a4d6e 50%, #1a2f4f 75%, #0a1628 100%), radial-gradient(ellipse at 50% 20%, rgba(0, 255, 170, 0.15) 0%, transparent 50%), radial-gradient(ellipse at 30% 40%, rgba(138, 43, 226, 0.1) 0%, transparent 50%), radial-gradient(ellipse at 70% 60%, rgba(0, 191, 255, 0.12) 0%, transparent 50%)',
+      'fire-gradient': 'linear-gradient(0deg, #1a0000 0%, #330000 10%, #660000 20%, #990000 30%, #cc0000 40%, #ff3300 50%, #ff6600 60%, #ff9900 70%, #ffcc00 80%, #ffff00 90%, #ffffff 100%)',
+      'ocean-depth': 'radial-gradient(ellipse at 50% 0%, rgba(13, 71, 161, 0.3) 0%, transparent 50%), radial-gradient(ellipse at 50% 100%, rgba(1, 87, 155, 0.4) 0%, transparent 50%), repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(33, 150, 243, 0.03) 2px, rgba(33, 150, 243, 0.03) 4px), linear-gradient(180deg, #001529 0%, #002b4a 25%, #003d5c 50%, #002b4a 75%, #001529 100%)',
+      'sunset-sky': 'linear-gradient(180deg, #0f2027 0%, #203a43 20%, #2c5364 40%, #c31432 70%, #f37335 85%, #fbb034 95%, #ffdd00 100%)',
+      'space-nebula': 'radial-gradient(ellipse at 20% 30%, rgba(147, 51, 234, 0.3) 0%, transparent 50%), radial-gradient(ellipse at 80% 70%, rgba(239, 68, 68, 0.25) 0%, transparent 50%), radial-gradient(ellipse at 50% 50%, rgba(59, 130, 246, 0.2) 0%, transparent 70%), radial-gradient(2px 2px at 10% 20%, white, transparent), radial-gradient(1px 1px at 90% 80%, white, transparent), radial-gradient(1px 1px at 50% 60%, white, transparent), radial-gradient(1px 1px at 30% 90%, white, transparent), radial-gradient(1px 1px at 70% 10%, white, transparent), #0a0a1e'
     };
 
     const selectedPattern = patterns[pattern] || patterns['none'];
@@ -1065,109 +1276,268 @@ const CustomizationManager = {
     const themes = {
       default: {
         primary: '#9346ff', accent: '#00e1ff', background: '#1a1b2e', text: '#ffffff',
+        cardBg: '#2a2b3d',
         slotStart: '#9346ff', slotEnd: '#00e1ff',
         buttonStart: '#9346ff', buttonEnd: '#7c3aed',
         sidebarStart: '#1a1b2e', sidebarEnd: '#16213e',
-        bgPattern: 'radial-gradient(circle at 20% 50%, rgba(147, 70, 255, 0.15) 0%, transparent 50%), radial-gradient(circle at 80% 80%, rgba(0, 225, 255, 0.15) 0%, transparent 50%)'
+        bgPattern: 'radial-gradient(circle at 20% 50%, rgba(147, 70, 255, 0.15) 0%, transparent 50%), radial-gradient(circle at 80% 80%, rgba(0, 225, 255, 0.15) 0%, transparent 50%)',
+        fontFamily: 'Poppins, sans-serif',
+        fontWeight: '400'
       },
       purple: {
         primary: '#a855f7', accent: '#c084fc', background: '#1e1b4b', text: '#ffffff',
+        cardBg: '#2d1b69',
         slotStart: '#a855f7', slotEnd: '#c084fc',
         buttonStart: '#a855f7', buttonEnd: '#9333ea',
         sidebarStart: '#1e1b4b', sidebarEnd: '#312e81',
-        bgPattern: 'repeating-linear-gradient(45deg, #1e1b4b 0px, #1e1b4b 40px, #312e81 40px, #312e81 80px)'
+        bgPattern: 'repeating-linear-gradient(45deg, #1e1b4b 0px, #1e1b4b 40px, #312e81 40px, #312e81 80px)',
+        fontFamily: 'Poppins, sans-serif',
+        fontWeight: '500'
       },
       blue: {
         primary: '#3b82f6', accent: '#60a5fa', background: '#1e3a8a', text: '#ffffff',
+        cardBg: '#1e40af',
         slotStart: '#3b82f6', slotEnd: '#60a5fa',
         buttonStart: '#3b82f6', buttonEnd: '#2563eb',
         sidebarStart: '#1e3a8a', sidebarEnd: '#1e40af',
-        bgPattern: 'linear-gradient(0deg, #1e3a8a 0%, #1e40af 100%), repeating-linear-gradient(90deg, rgba(59, 130, 246, 0.1) 0px, transparent 1px, transparent 40px, rgba(59, 130, 246, 0.1) 41px)'
+        bgPattern: 'linear-gradient(0deg, #1e3a8a 0%, #1e40af 100%), repeating-linear-gradient(90deg, rgba(59, 130, 246, 0.1) 0px, transparent 1px, transparent 40px, rgba(59, 130, 246, 0.1) 41px)',
+        fontFamily: 'Roboto, sans-serif',
+        fontWeight: '400'
       },
       green: {
         primary: '#10b981', accent: '#34d399', background: '#064e3b', text: '#ffffff',
+        cardBg: '#065f46',
         slotStart: '#10b981', slotEnd: '#34d399',
         buttonStart: '#10b981', buttonEnd: '#059669',
         sidebarStart: '#064e3b', sidebarEnd: '#065f46',
-        bgPattern: 'radial-gradient(circle at 50% 50%, rgba(16, 185, 129, 0.2) 0%, transparent 60%), linear-gradient(180deg, #064e3b 0%, #065f46 100%)'
+        bgPattern: 'radial-gradient(circle at 50% 50%, rgba(16, 185, 129, 0.2) 0%, transparent 60%), linear-gradient(180deg, #064e3b 0%, #065f46 100%)',
+        fontFamily: 'Roboto, sans-serif',
+        fontWeight: '400'
       },
       red: {
         primary: '#ef4444', accent: '#f87171', background: '#7f1d1d', text: '#ffffff',
+        cardBg: '#991b1b',
         slotStart: '#ef4444', slotEnd: '#f87171',
         buttonStart: '#ef4444', buttonEnd: '#dc2626',
         sidebarStart: '#7f1d1d', sidebarEnd: '#991b1b',
-        bgPattern: 'repeating-radial-gradient(circle at 0 0, transparent 0, #7f1d1d 40px), repeating-linear-gradient(#991b1b55, #991b1b)'
+        bgPattern: 'repeating-radial-gradient(circle at 0 0, transparent 0, #7f1d1d 40px), repeating-linear-gradient(#991b1b55, #991b1b)',
+        fontFamily: 'Roboto, sans-serif',
+        fontWeight: '500'
       },
       dark: {
         primary: '#6b7280', accent: '#9ca3af', background: '#111827', text: '#ffffff',
+        cardBg: '#1f2937',
         slotStart: '#6b7280', slotEnd: '#9ca3af',
         buttonStart: '#6b7280', buttonEnd: '#4b5563',
         sidebarStart: '#111827', sidebarEnd: '#1f2937',
-        bgPattern: 'linear-gradient(180deg, #111827 0%, #1f2937 100%)'
+        bgPattern: 'linear-gradient(180deg, #111827 0%, #1f2937 100%)',
+        fontFamily: 'Roboto, sans-serif',
+        fontWeight: '400'
       },
       // HEAVY THEMES
       gold: {
         primary: '#fbbf24', accent: '#fcd34d', background: '#1c1917', text: '#fef3c7',
+        cardBg: '#292524',
         slotStart: '#d97706', slotEnd: '#fbbf24',
         buttonStart: '#b45309', buttonEnd: '#d97706',
         sidebarStart: '#292524', sidebarEnd: '#1c1917',
-        bgPattern: 'repeating-linear-gradient(45deg, #1c1917 0px, #1c1917 20px, #292524 20px, #292524 40px), radial-gradient(circle at 70% 30%, rgba(251, 191, 36, 0.1) 0%, transparent 50%)'
+        bgPattern: 'repeating-linear-gradient(45deg, #1c1917 0px, #1c1917 20px, #292524 20px, #292524 40px), radial-gradient(circle at 70% 30%, rgba(251, 191, 36, 0.1) 0%, transparent 50%)',
+        fontFamily: 'Poppins, sans-serif',
+        fontWeight: '600'
       },
       'grey-red': {
         primary: '#dc2626', accent: '#ef4444', background: '#374151', text: '#f3f4f6',
         slotStart: '#6b7280', slotEnd: '#dc2626',
         buttonStart: '#991b1b', buttonEnd: '#dc2626',
         sidebarStart: '#374151', sidebarEnd: '#1f2937',
-        bgPattern: 'linear-gradient(135deg, #374151 25%, transparent 25%), linear-gradient(225deg, #374151 25%, transparent 25%), linear-gradient(45deg, #1f2937 25%, transparent 25%), linear-gradient(315deg, #1f2937 25%, #374151 25%)'
+        bgPattern: 'linear-gradient(135deg, #374151 25%, transparent 25%), linear-gradient(225deg, #374151 25%, transparent 25%), linear-gradient(45deg, #1f2937 25%, transparent 25%), linear-gradient(315deg, #1f2937 25%, #374151 25%)',
+        fontFamily: 'Roboto, sans-serif',
+        fontWeight: '500'
       },
       'black-red': {
         primary: '#dc2626', accent: '#f87171', background: '#000000', text: '#ffffff',
         slotStart: '#7f1d1d', slotEnd: '#dc2626',
         buttonStart: '#450a0a', buttonEnd: '#991b1b',
         sidebarStart: '#0a0a0a', sidebarEnd: '#000000',
-        bgPattern: 'radial-gradient(circle at 30% 30%, rgba(127, 29, 29, 0.3) 0%, transparent 50%), radial-gradient(circle at 70% 70%, rgba(220, 38, 38, 0.2) 0%, transparent 50%), linear-gradient(180deg, #000000 0%, #0a0a0a 100%)'
+        bgPattern: 'radial-gradient(circle at 30% 30%, rgba(127, 29, 29, 0.3) 0%, transparent 50%), radial-gradient(circle at 70% 70%, rgba(220, 38, 38, 0.2) 0%, transparent 50%), linear-gradient(180deg, #000000 0%, #0a0a0a 100%)',
+        fontFamily: 'Roboto, sans-serif',
+        fontWeight: '600'
       },
       chrome: {
         primary: '#e5e7eb', accent: '#f3f4f6', background: '#1f2937', text: '#ffffff',
         slotStart: '#9ca3af', slotEnd: '#d1d5db',
         buttonStart: '#6b7280', buttonEnd: '#9ca3af',
         sidebarStart: '#374151', sidebarEnd: '#1f2937',
-        bgPattern: 'linear-gradient(90deg, #1f2937 0%, #374151 50%, #1f2937 100%), repeating-linear-gradient(0deg, transparent 0px, rgba(229, 231, 235, 0.05) 1px, transparent 2px, transparent 40px)'
+        bgPattern: 'linear-gradient(90deg, #1f2937 0%, #374151 50%, #1f2937 100%), repeating-linear-gradient(0deg, transparent 0px, rgba(229, 231, 235, 0.05) 1px, transparent 2px, transparent 40px)',
+        fontFamily: 'Roboto, sans-serif',
+        fontWeight: '300'
       },
       'neon-blue': {
         primary: '#06b6d4', accent: '#22d3ee', background: '#0c4a6e', text: '#e0f2fe',
+        cardBg: '#075985',
         slotStart: '#0284c7', slotEnd: '#06b6d4',
         buttonStart: '#0369a1', buttonEnd: '#0891b2',
         sidebarStart: '#0c4a6e', sidebarEnd: '#075985',
-        bgPattern: 'repeating-linear-gradient(0deg, #0c4a6e 0px, #0c4a6e 2px, #075985 2px, #075985 4px), radial-gradient(circle at 50% 50%, rgba(6, 182, 212, 0.3) 0%, transparent 50%)'
+        bgPattern: 'repeating-linear-gradient(0deg, #0c4a6e 0px, #0c4a6e 2px, #075985 2px, #075985 4px), radial-gradient(circle at 50% 50%, rgba(6, 182, 212, 0.3) 0%, transparent 50%)',
+        fontFamily: 'Poppins, sans-serif',
+        fontWeight: '600'
       },
       'neon-pink': {
         primary: '#ec4899', accent: '#f472b6', background: '#831843', text: '#fce7f3',
+        cardBg: '#9f1239',
         slotStart: '#db2777', slotEnd: '#ec4899',
         buttonStart: '#9f1239', buttonEnd: '#db2777',
         sidebarStart: '#831843', sidebarEnd: '#9f1239',
-        bgPattern: 'radial-gradient(circle at 20% 80%, rgba(236, 72, 153, 0.3) 0%, transparent 50%), radial-gradient(circle at 80% 20%, rgba(244, 114, 182, 0.2) 0%, transparent 50%), linear-gradient(135deg, #831843 0%, #9f1239 100%)'
+        bgPattern: 'radial-gradient(circle at 20% 80%, rgba(236, 72, 153, 0.3) 0%, transparent 50%), radial-gradient(circle at 80% 20%, rgba(244, 114, 182, 0.2) 0%, transparent 50%), linear-gradient(135deg, #831843 0%, #9f1239 100%)',
+        fontFamily: 'Poppins, sans-serif',
+        fontWeight: '600'
       },
       'neon-green': {
         primary: '#10b981', accent: '#34d399', background: '#064e3b', text: '#d1fae5',
+        cardBg: '#065f46',
         slotStart: '#059669', slotEnd: '#10b981',
         buttonStart: '#047857', buttonEnd: '#059669',
         sidebarStart: '#064e3b', sidebarEnd: '#065f46',
-        bgPattern: 'repeating-linear-gradient(45deg, #064e3b 0px, #064e3b 40px, #065f46 40px, #065f46 80px), radial-gradient(circle at 50% 50%, rgba(16, 185, 129, 0.2) 0%, transparent 70%)'
+        bgPattern: 'repeating-linear-gradient(45deg, #064e3b 0px, #064e3b 40px, #065f46 40px, #065f46 80px), radial-gradient(circle at 50% 50%, rgba(16, 185, 129, 0.2) 0%, transparent 70%)',
+        fontFamily: 'Poppins, sans-serif',
+        fontWeight: '600'
       },
       rainbow: {
         primary: '#f472b6', accent: '#a78bfa', background: '#1e1b4b', text: '#ffffff',
+        cardBg: '#312e81',
         slotStart: '#ec4899', slotEnd: '#8b5cf6',
         buttonStart: '#f97316', buttonEnd: '#ec4899',
         sidebarStart: '#1e1b4b', sidebarEnd: '#312e81',
-        bgPattern: 'linear-gradient(45deg, rgba(236, 72, 153, 0.1) 0%, rgba(139, 92, 246, 0.1) 25%, rgba(6, 182, 212, 0.1) 50%, rgba(16, 185, 129, 0.1) 75%, rgba(249, 115, 22, 0.1) 100%), linear-gradient(180deg, #1e1b4b 0%, #312e81 100%)'
+        bgPattern: 'linear-gradient(45deg, rgba(236, 72, 153, 0.1) 0%, rgba(139, 92, 246, 0.1) 25%, rgba(6, 182, 212, 0.1) 50%, rgba(16, 185, 129, 0.1) 75%, rgba(249, 115, 22, 0.1) 100%), linear-gradient(180deg, #1e1b4b 0%, #312e81 100%)',
+        fontFamily: 'Poppins, sans-serif',
+        fontWeight: '600'
       },
       'black-sky': {
         primary: '#4b5563', accent: '#6b7280', background: '#000000', text: '#e5e7eb',
         slotStart: '#1f2937', slotEnd: '#374151',
         buttonStart: '#111827', buttonEnd: '#1f2937',
         sidebarStart: '#000000', sidebarEnd: '#0a0a0a',
-        bgPattern: 'radial-gradient(ellipse at top, rgba(31, 41, 55, 0.4) 0%, transparent 60%), radial-gradient(ellipse at bottom, rgba(17, 24, 39, 0.3) 0%, transparent 50%), radial-gradient(circle at 20% 20%, rgba(75, 85, 99, 0.1) 0%, transparent 30%), radial-gradient(circle at 80% 80%, rgba(55, 65, 81, 0.1) 0%, transparent 30%), linear-gradient(180deg, #000000 0%, #050505 50%, #000000 100%)'
+        bgPattern: 'radial-gradient(ellipse at top, rgba(31, 41, 55, 0.4) 0%, transparent 60%), radial-gradient(ellipse at bottom, rgba(17, 24, 39, 0.3) 0%, transparent 50%), radial-gradient(circle at 20% 20%, rgba(75, 85, 99, 0.1) 0%, transparent 30%), radial-gradient(circle at 80% 80%, rgba(55, 65, 81, 0.1) 0%, transparent 30%), linear-gradient(180deg, #000000 0%, #050505 50%, #000000 100%)',
+        fontFamily: 'Roboto, sans-serif',
+        fontWeight: '300'
+      },
+      // PREMIUM THEMES
+      'cyber-purple': {
+        primary: '#ba55d3', accent: '#9370db', background: '#1a0033', text: '#e9d5ff',
+        cardBg: '#2d1b4e',
+        slotStart: '#6a0dad', slotEnd: '#ba55d3',
+        buttonStart: '#6a0dad', buttonEnd: '#9370db',
+        sidebarStart: '#1a0033', sidebarEnd: '#2d1b4e',
+        bgPattern: 'radial-gradient(circle at 30% 50%, rgba(186, 85, 211, 0.2) 0%, transparent 50%), radial-gradient(circle at 70% 70%, rgba(147, 112, 219, 0.15) 0%, transparent 50%), linear-gradient(135deg, #1a0033 0%, #2d1b4e 100%)',
+        fontFamily: 'Orbitron, monospace',
+        fontWeight: '700'
+      },
+      'ocean-blue': {
+        primary: '#00acc1', accent: '#00758f', background: '#001f3f', text: '#e0f7fa',
+        cardBg: '#003d5c',
+        slotStart: '#003d5c', slotEnd: '#00acc1',
+        buttonStart: '#003d5c', buttonEnd: '#00758f',
+        sidebarStart: '#001f3f', sidebarEnd: '#003d5c',
+        bgPattern: 'linear-gradient(180deg, #001f3f 0%, #003d5c 50%, #001f3f 100%)',
+        fontFamily: 'Roboto, sans-serif',
+        fontWeight: '400'
+      },
+      'sunset-orange': {
+        primary: '#ffa500', accent: '#ff6347', background: '#1a0f00', text: '#fff3e0',
+        cardBg: '#2d1a00',
+        slotStart: '#ff4500', slotEnd: '#ffa500',
+        buttonStart: '#ff4500', buttonEnd: '#ff6347',
+        sidebarStart: '#1a0f00', sidebarEnd: '#2d1a00',
+        bgPattern: 'linear-gradient(0deg, #1a0f00 0%, #ff4500 40%, #ff6347 60%, #ffa500 100%)',
+        fontFamily: 'Poppins, sans-serif',
+        fontWeight: '500'
+      },
+      'forest-green': {
+        primary: '#2e7d32', accent: '#1b5e20', background: '#0b1f0d', text: '#c8e6c9',
+        cardBg: '#1b5e20',
+        slotStart: '#0b4619', slotEnd: '#2e7d32',
+        buttonStart: '#0b4619', buttonEnd: '#1b5e20',
+        sidebarStart: '#0b1f0d', sidebarEnd: '#1b5e20',
+        bgPattern: 'radial-gradient(circle at 50% 50%, rgba(46, 125, 50, 0.2) 0%, transparent 60%), linear-gradient(180deg, #0b1f0d 0%, #1b5e20 100%)',
+        fontFamily: 'Roboto, sans-serif',
+        fontWeight: '400'
+      },
+      'midnight-purple': {
+        primary: '#6a1b9a', accent: '#4a148c', background: '#0a0014', text: '#e1bee7',
+        cardBg: '#1a0033',
+        slotStart: '#1a0033', slotEnd: '#6a1b9a',
+        buttonStart: '#1a0033', buttonEnd: '#4a148c',
+        sidebarStart: '#0a0014', sidebarEnd: '#1a0033',
+        bgPattern: 'radial-gradient(ellipse at center, rgba(106, 27, 154, 0.3) 0%, transparent 70%), linear-gradient(180deg, #0a0014 0%, #1a0033 100%)',
+        fontFamily: 'Poppins, sans-serif',
+        fontWeight: '500'
+      },
+      'lava-red': {
+        primary: '#ff5722', accent: '#d32f2f', background: '#1a0000', text: '#ffccbc',
+        cardBg: '#2d0000',
+        slotStart: '#b71c1c', slotEnd: '#ff5722',
+        buttonStart: '#b71c1c', buttonEnd: '#d32f2f',
+        sidebarStart: '#1a0000', sidebarEnd: '#2d0000',
+        bgPattern: 'radial-gradient(circle at 50% 30%, rgba(211, 47, 47, 0.4) 0%, transparent 50%), radial-gradient(circle at 30% 70%, rgba(255, 87, 34, 0.3) 0%, transparent 50%), linear-gradient(180deg, #1a0000 0%, #2d0000 100%)',
+        fontFamily: 'Poppins, sans-serif',
+        fontWeight: '600'
+      },
+      'ice-blue': {
+        primary: '#80deea', accent: '#b2ebf2', background: '#003d5c', text: '#003d5c',
+        cardBg: '#26a69a',
+        slotStart: '#e0f7fa', slotEnd: '#80deea',
+        buttonStart: '#b2ebf2', buttonEnd: '#80deea',
+        sidebarStart: '#e0f7fa', sidebarEnd: '#b2ebf2',
+        bgPattern: 'linear-gradient(135deg, #e0f7fa 0%, #b2ebf2 50%, #80deea 100%)',
+        fontFamily: 'Roboto, sans-serif',
+        fontWeight: '300'
+      },
+      'toxic-green': {
+        primary: '#7cb342', accent: '#558b2f', background: '#1a2e0b', text: '#dcedc8',
+        slotStart: '#33691e', slotEnd: '#7cb342',
+        buttonStart: '#33691e', buttonEnd: '#558b2f',
+        sidebarStart: '#1a2e0b', sidebarEnd: '#33691e',
+        bgPattern: 'radial-gradient(circle at 50% 50%, rgba(124, 179, 66, 0.3) 0%, transparent 60%), linear-gradient(180deg, #1a2e0b 0%, #33691e 100%)',
+        fontFamily: 'Roboto Mono, monospace',
+        fontWeight: '600'
+      },
+      'royal-gold': {
+        primary: '#ffd54f', accent: '#ffb74d', background: '#2d2000', text: '#3e2723',
+        slotStart: '#f9a825', slotEnd: '#ffd54f',
+        buttonStart: '#f9a825', buttonEnd: '#ffb74d',
+        sidebarStart: '#fff3e0', sidebarEnd: '#ffecb3',
+        bgPattern: 'linear-gradient(135deg, #fff3e0 0%, #ffecb3 50%, #ffe082 100%)',
+        fontFamily: 'Georgia, serif',
+        fontWeight: '600'
+      },
+      'wine-lovers': {
+        primary: '#ad1457', accent: '#880e4f', background: '#000000', text: '#fce4ec',
+        cardBg: '#2d0000',
+        slotStart: '#000000', slotEnd: '#ad1457',
+        buttonStart: '#000000', buttonEnd: '#880e4f',
+        sidebarStart: '#000000', sidebarEnd: '#0a0000',
+        bgPattern: 'radial-gradient(circle at 50% 50%, rgba(173, 20, 87, 0.4) 0%, transparent 60%), linear-gradient(180deg, #000000 0%, #0a0000 100%)',
+        fontFamily: 'Crimson Text, serif',
+        fontWeight: '600'
+      },
+      'matrix-green': {
+        primary: '#00ff00', accent: '#33ff33', background: '#001100', text: '#000000',
+        slotStart: '#003300', slotEnd: '#00ff00',
+        buttonStart: '#003300', buttonEnd: '#33ff33',
+        sidebarStart: '#001100', sidebarEnd: '#003300',
+        bgPattern: 'linear-gradient(180deg, #001100 0%, #003300 100%)',
+        fontFamily: 'Courier New, monospace',
+        fontWeight: '700'
+      },
+      'synthwave': {
+        primary: '#06ffa5', accent: '#3a86ff', background: '#1a0033', text: '#ffffff',
+        cardBg: '#2d004d',
+        slotStart: '#ff006e', slotEnd: '#06ffa5',
+        buttonStart: '#8338ec', buttonEnd: '#3a86ff',
+        sidebarStart: '#1a0033', sidebarEnd: '#2d004d',
+        bgPattern: 'linear-gradient(135deg, #ff006e 0%, #8338ec 33%, #3a86ff 66%, #06ffa5 100%)',
+        fontFamily: 'Orbitron, monospace',
+        fontWeight: '700'
       }
     };
 
@@ -1177,6 +1547,14 @@ const CustomizationManager = {
       document.getElementById('accent-color').value = selectedTheme.accent;
       document.getElementById('background-color').value = selectedTheme.background;
       document.getElementById('text-color').value = selectedTheme.text;
+      
+      // Set card background if available
+      const cardBgInput = document.getElementById('card-background-color');
+      if (cardBgInput && selectedTheme.cardBg) {
+        cardBgInput.value = selectedTheme.cardBg;
+        localStorage.setItem('customCardBackground', selectedTheme.cardBg);
+      }
+      
       document.getElementById('slot-gradient-start').value = selectedTheme.slotStart;
       document.getElementById('slot-gradient-end').value = selectedTheme.slotEnd;
       document.getElementById('button-gradient-start').value = selectedTheme.buttonStart;
@@ -1190,7 +1568,22 @@ const CustomizationManager = {
         document.body.style.backgroundColor = selectedTheme.background;
       }
       
+      // Apply font family and weight
+      if (selectedTheme.fontFamily) {
+        document.body.style.fontFamily = selectedTheme.fontFamily;
+      }
+      if (selectedTheme.fontWeight) {
+        document.body.style.fontWeight = selectedTheme.fontWeight;
+      }
+      
       this.applyAllColors();
+      
+      // Refresh tournament bracket styling if function exists
+      setTimeout(() => {
+        if (window.refreshTournamentBracketStyling) {
+          window.refreshTournamentBracketStyling();
+        }
+      }, 100);
     }
   },
 
@@ -1223,10 +1616,13 @@ const CustomizationManager = {
       animatedGradients: document.getElementById('animated-gradients-toggle')?.checked,
       glowEffects: document.getElementById('glow-effects-toggle')?.checked,
       sidebarBackgrounds: document.getElementById('sidebar-backgrounds-toggle')?.checked,
+      hideChat: document.getElementById('hide-chat-toggle')?.checked,
       // General
       streamerName: document.getElementById('custom-streamer-name')?.value,
       websiteUrl: document.getElementById('custom-website-url')?.value,
-      backgroundType: document.getElementById('background-type')?.value
+      backgroundType: document.getElementById('background-type')?.value,
+      sidebarPosition: document.getElementById('sidebar-position')?.value,
+      dragResizeEnabled: document.getElementById('enable-drag-resize')?.checked
     };
 
     StorageHelper.set('customization', settings);
@@ -1258,6 +1654,7 @@ const CustomizationManager = {
     if (settings.animatedGradients !== undefined) document.getElementById('animated-gradients-toggle').checked = settings.animatedGradients;
     if (settings.glowEffects !== undefined) document.getElementById('glow-effects-toggle').checked = settings.glowEffects;
     if (settings.sidebarBackgrounds !== undefined) document.getElementById('sidebar-backgrounds-toggle').checked = settings.sidebarBackgrounds;
+    if (settings.hideChat !== undefined) document.getElementById('hide-chat-toggle').checked = settings.hideChat;
 
     // Load general
     if (settings.streamerName) {
@@ -1276,6 +1673,31 @@ const CustomizationManager = {
     if (settings.backgroundType) {
       document.getElementById('background-type').value = settings.backgroundType;
       this.handleBackgroundType();
+    }
+    if (settings.sidebarPosition) {
+      document.getElementById('sidebar-position').value = settings.sidebarPosition;
+      this.applySidebarPosition();
+    }
+    
+    // Load tournament bracket layout
+    const tournamentLayoutDropdown = document.getElementById('tournament-bracket-layout');
+    if (tournamentLayoutDropdown) {
+      const isHorizontal = localStorage.getItem('tournamentLayoutHorizontal') === 'true';
+      tournamentLayoutDropdown.value = isHorizontal ? 'horizontal' : 'vertical';
+    }
+    
+    // Load info panel position
+    const infoPanelPositionDropdown = document.getElementById('info-panel-position');
+    if (infoPanelPositionDropdown) {
+      const savedPosition = localStorage.getItem('infoPanelPosition') || 'center-right';
+      infoPanelPositionDropdown.value = savedPosition;
+      this.applyInfoPanelPosition();
+    }
+    
+    if (settings.dragResizeEnabled !== undefined) {
+      const toggle = document.getElementById('enable-drag-resize');
+      if (toggle) toggle.checked = settings.dragResizeEnabled;
+      this.applyDragResize(!!settings.dragResizeEnabled);
     }
 
     // Load custom logo
