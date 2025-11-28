@@ -6,17 +6,21 @@
   <title>Streamer Overlay Dashboard</title>
   <link rel="stylesheet" href="style.css" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=Poppins:wght@300;400;500;600;700&family=Roboto:wght@300;400;500;600;700&family=Roboto+Mono:wght@400;600;700&family=Orbitron:wght@400;700&family=Crimson+Text:wght@400;600&display=swap" rel="stylesheet">
   
   <!-- Slot Database -->
   <script src="slotdatabase.js"></script>
   
   <!-- Modular JavaScript Files -->
   <script src="js/utils.js"></script>
+  <script src="js/bonusHuntCalculator.js"></script>
+  <script src="js/bonusHuntIntegration.js"></script>
   <script src="js/tournament.js"></script>
   <script src="js/bonushunt.js"></script>
   <script src="js/randomslot.js"></script>
   <script src="js/tutorial.js"></script>
+  <script src="js/giveaway.js"></script>
   
   <!-- Main Script -->
   <script defer src="script-new.js"></script>
@@ -29,7 +33,7 @@
         <img src="https://static.twitchcdn.net/assets/favicon-32-e29e246c157142c94346.png" alt="Logo" class="navbar-logo" id="navbar-logo" style="cursor: pointer;" title="Click to change logo"/>
         <input type="file" id="logo-upload-input" accept="image/*" style="display: none;">
         <!-- Replace Twitch login with static username -->
-        <span class="streamer-name osecaadegas95-name" id="streamer-name" style="cursor: pointer;" title="Click to edit streamer name">Osecaadegas95</span>
+        <span class="streamer-name osecaadegas95-name" id="streamer-name" style="cursor: pointer;" title="Click to edit streamer name">Streamer</span>
         <input type="text" id="streamer-name-input" style="display: none; background: rgba(0,0,0,0.7); color: white; border: 1px solid #00e1ff; border-radius: 4px; padding: 2px 6px; font-size: inherit; font-family: inherit;">
         <!-- Image Switcher Start (right after login button) -->
         <div id="navbar-image-switcher" class="navbar-switcher-container" style="display:inline-block; margin-left: 10px; cursor: pointer;">
@@ -41,9 +45,9 @@
         <span id="current-time" class="current-time"></span>
       </div>
       <div class="navbar-right">
-         <a href="https://osecaadegas.github.io/95/" target="_blank" class="navbar-website-btn" id="website-link">
+         <a href="#" target="_blank" class="navbar-website-btn" id="website-link">
           <span class="website-btn-icon">🌐</span>
-          <span id="website-text" style="cursor: pointer;" title="Click to edit website URL">osecaadegas.github.io/95/</span>
+          <span id="website-text" style="cursor: pointer;" title="Click to edit website URL">Your Website</span>
         </a>
         <input type="url" id="website-input" style="display: none; background: rgba(0,0,0,0.7); color: white; border: 1px solid #00e1ff; border-radius: 4px; padding: 2px 6px; font-size: inherit; font-family: inherit; width: 200px;">
         <a href="https://www.begambleaware.org/" target="_blank" class="aware-link">Be Gamble Aware|+🔞</a>
@@ -68,12 +72,54 @@
 
     <!-- Main Content Layout -->
     <div class="main-layout">
+      <!-- Tournament Bracket Left Panel -->
+      <aside class="tournament-left-panel" id="tournament-left-panel" style="display: none;">
+        <div class="info-section tournament-bracket" id="tournament-bracket" style="display: block;">
+          <div class="tournament-bracket-header">
+            <div class="bracket-title-row" style="justify-content: center;">
+              <h4 id="tournament-phase-title">Tournament Bracket</h4>
+            </div>
+            <div class="tournament-overview">
+              <div class="overview-stat">
+                <span class="stat-label">Format:</span>
+                <span class="stat-value" id="tournament-format-display">Single Elimination</span>
+              </div>
+              <div class="overview-stat">
+                <span class="stat-label">Players:</span>
+                <span class="stat-value" id="tournament-players-count">8</span>
+              </div>
+              <div class="overview-stat">
+                <span class="stat-label">Current Phase:</span>
+                <span class="stat-value" id="tournament-current-phase">Quarter-Finals</span>
+              </div>
+            </div>
+          </div>
+          
+          <div class="tournament-bracket-container">
+            <div class="tournament-bracket-content" id="tournament-bracket-content">
+              <!-- Bracket visualization will be dynamically generated here -->
+            </div>
+          </div>
+          
+          <!-- Tournament History/Stats -->
+          <div class="tournament-history" id="tournament-history" style="display: none;">
+            <div class="history-header">
+              <h5>Match History</h5>
+              <button class="history-toggle" id="toggle-history">📊</button>
+            </div>
+            <div class="history-content" id="history-content">
+              <!-- Match history will be populated here -->
+            </div>
+          </div>
+        </div>
+      </aside>
+      
       <!-- Modern Circular Sidebar -->
       <aside class="sidebar">
         <div class="sidebar-main-btn" id="sidebar-toggle"></div>
         <div class="sidebar-fan">
-          <button class="sidebar-btn" id="spotify-btn">
-            <img src="./assets/music.png" alt="Spotify" class="sidebar-icon-img">
+          <button class="sidebar-btn" id="customization-btn">
+            <img src="./assets/palet.png" alt="Customization" class="sidebar-icon-img">
           </button>
           <button class="sidebar-btn" id="bh-btn">
             <img src="./assets/crossair.png" alt="Bonus Hunt" class="sidebar-icon-img">
@@ -87,6 +133,9 @@
           <button class="sidebar-btn" id="tournament-btn">
             <img src="./assets/tornament.png" alt="Tournament" class="sidebar-icon-img">
           </button>
+          <button class="sidebar-btn" id="giveaway-btn">
+            <img src="./assets/giveaway.png" alt="Giveaway" class="sidebar-icon-img">
+          </button>
           <button class="sidebar-btn" id="ad-btn">
             <label for="ad-image-input" style="cursor: pointer; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;">
               <img src="./assets/art.png" alt="Art" class="sidebar-icon-img">
@@ -95,9 +144,6 @@
           </button>
           <button class="sidebar-btn" id="lock-btn">
             <img id="lock-icon" src="./assets/unlock.png" alt="Lock/Unlock" class="sidebar-icon-img" style="width: 100%; height: 100%; object-fit: contain;">
-          </button>
-          <button class="sidebar-btn" id="customization-btn">
-            <img src="./assets/palet.png" alt="Customization" class="sidebar-icon-img">
           </button>
         </div>
       </aside>
@@ -118,6 +164,16 @@
         </div>
         <div class="middle-panel-row">
           <label class="middle-input-label left">
+            Actual Balance
+            <input type="number" id="actual-balance-input" class="middle-input" placeholder="Current balance" min="0" step="any" />
+          </label>
+          <label class="middle-input-label right">
+            Total Spent
+            <input type="number" id="total-spent-input" class="middle-input" placeholder="Auto calculated" min="0" step="any" readonly />
+          </label>
+        </div>
+        <div class="middle-panel-row">
+          <label class="middle-input-label left">
             Slot Name
             <div style="position: relative;">
               <input type="text" id="slot-name-input" class="middle-input" placeholder="Slot Name" />
@@ -127,6 +183,10 @@
           <label class="middle-input-label right">
             Bet Size
             <input type="number" id="bet-size-input" class="middle-input" placeholder="Enter bet size" min="0" step="any" />
+            <button class="add-slot-btn" id="add-slot-btn" type="button">
+              <span>➕</span>
+              <span>Slot</span>
+            </button>
           </label>
         </div>
         <div class="middle-panel-row" id="slot-img-url-row" style="display: none;">
@@ -155,10 +215,6 @@
               <span class="middle-icon">▶️</span>
               <span>Bonus Opening</span>
             </button>
-            <a href="bonuslist-overlay.html" target="_blank" class="middle-btn small-btn" title="Open bonus list page for OBS">
-              <span class="middle-icon">📺</span>
-              <span>OBS Overlay</span>
-            </a>
           </div>        </div>
       </section>
 
@@ -449,83 +505,90 @@
 
       <!-- Right Info Panel -->
       <aside class="info-panel">
-        <!-- Bonus Hunt Stats Bar -->
-        <div class="bh-stats-bar">
-          <div class="bh-stat-item">
-            <div class="bh-stat-icon">💰</div>
-            <div class="bh-stat-value" id="bh-start-value">--</div>
-            <div class="bh-stat-label">START</div>
+        <!-- Bonus Hunt Stats integrated into info panel -->
+        <div class="bonus-stats-panel-inline" id="bonus-stats-panel" style="display: none;">
+          <div class="stats-panel-header">
+            <h3>📊 Bonus Hunt Statistics</h3>
           </div>
-          <div class="bh-stat-item" id="bh-best-slot-item">
-            <div class="bh-stat-icon" id="bh-best-slot-icon">🎰</div>
-            <div class="bh-stat-value" id="bh-target-value">--</div>
-            <div class="bh-stat-label">BEST</div>
-          </div>
-          <div class="bh-stat-item" id="bh-worst-slot-item">
-            <div class="bh-stat-icon" id="bh-worst-slot-icon">💀</div>
-            <div class="bh-stat-value" id="bh-worst-value">--</div>
-            <div class="bh-stat-label">WORST</div>
-          </div>
-          <div class="bh-stat-item">
-            <div class="bh-stat-icon">📈</div>
-            <div class="bh-stat-value" id="bh-avgx-value">0X</div>
-            <div class="bh-stat-label">AVG X</div>
-          </div>
-          <div class="bh-stat-item">
-            <div class="bh-stat-icon">🚀</div>
-            <div class="bh-stat-value" id="bh-reqx-value">0X</div>
-            <div class="bh-stat-label">REQ X</div>
+          <div class="stats-panel-content">
+            <div class="stat-card">
+              <div class="stat-icon">💰</div>
+              <div class="stat-info">
+                <div class="stat-label">Start Money</div>
+                <div class="stat-value" id="bh-stat-start">€0.00</div>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon">🎯</div>
+              <div class="stat-info">
+                <div class="stat-label">Target Money</div>
+                <div class="stat-value" id="bh-stat-target">€0.00</div>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon">💵</div>
+              <div class="stat-info">
+                <div class="stat-label">Current Balance</div>
+                <div class="stat-value" id="bh-stat-current">€0.00</div>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon">💸</div>
+              <div class="stat-info">
+                <div class="stat-label">Total Spent</div>
+                <div class="stat-value" id="bh-stat-spent">€0.00</div>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon">📈</div>
+              <div class="stat-info">
+                <div class="stat-label">Total Profit/Loss</div>
+                <div class="stat-value" id="bh-stat-profit">€0.00</div>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon">🎰</div>
+              <div class="stat-info">
+                <div class="stat-label">Best Slot</div>
+                <div class="stat-value" id="bh-stat-best">--</div>
+                <div class="stat-subvalue" id="bh-stat-best-value">€0.00</div>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon">💀</div>
+              <div class="stat-info">
+                <div class="stat-label">Worst Slot</div>
+                <div class="stat-value" id="bh-stat-worst">--</div>
+                <div class="stat-subvalue" id="bh-stat-worst-value">€0.00</div>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon">🎲</div>
+              <div class="stat-info">
+                <div class="stat-label">Total Bonuses</div>
+                <div class="stat-value" id="bh-stat-total-bonuses">0</div>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon">📊</div>
+              <div class="stat-info">
+                <div class="stat-label">Average Multiplier</div>
+                <div class="stat-value" id="bh-stat-avg-multi">0.00x</div>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon">🚀</div>
+              <div class="stat-info">
+                <div class="stat-label">Required Multiplier</div>
+                <div class="stat-value" id="bh-stat-req-multi">0.00x</div>
+              </div>
+            </div>
           </div>
         </div>
-        
-        <!-- Tournament Bracket Section (hidden by default) -->
-        <div class="info-section tournament-bracket" id="tournament-bracket" style="display: none;">
-          <div class="tournament-bracket-header">
-            <div class="bracket-title-row" style="justify-content: center;">
-              <h4 id="tournament-phase-title">Tournament Bracket</h4>
-            </div>
-            <div class="tournament-overview">
-              <div class="overview-stat">
-                <span class="stat-label">Format:</span>
-                <span class="stat-value" id="tournament-format-display">Single Elimination</span>
-              </div>
-              <div class="overview-stat">
-                <span class="stat-label">Players:</span>
-                <span class="stat-value" id="tournament-players-count">8</span>
-              </div>
-              <div class="overview-stat">
-                <span class="stat-label">Current Phase:</span>
-                <span class="stat-value" id="tournament-current-phase">Quarter-Finals</span>
-              </div>
-            </div>
-          </div>
-          
-          <div class="tournament-bracket-container">
-            <div class="tournament-bracket-content" id="tournament-bracket-content">
-              <!-- Bracket visualization will be dynamically generated here -->
-            </div>
-          </div>
-          
-          <!-- Tournament History/Stats -->
-          <div class="tournament-history" id="tournament-history" style="display: none;">
-            <div class="history-header">
-              <h5>Match History</h5>
-              <button class="history-toggle" id="toggle-history">📊</button>
-            </div>
-            <div class="history-content" id="history-content">
-              <!-- Match history will be populated here -->
-            </div>
-          </div>
-        </div>
-
         <div class="info-section bonus-list">
           <div class="bonus-list-inner-container">
             <div class="bonus-list-header">
               <h4>Bonus List</h4>
-              <div class="carousel-controls">
-                <button class="carousel-control pause-btn" id="carousel-pause" title="Pause/Play">⏸️</button>
-                <button class="carousel-control speed-btn" id="carousel-speed" title="Speed: Normal">🏃</button>
-              </div>
             </div>
             <div class="carousel-container">
               <div class="gradient-overlay-top"></div>
@@ -636,6 +699,53 @@
               <button class="custom-reset-btn" id="reset-bg-btn">Reset</button>
             </div>
           </div>
+
+          <div class="customization-section">
+            <h3>📍 Bonus List Panel Position</h3>
+            <div class="customization-row">
+              <label>Panel Position:</label>
+              <select id="info-panel-position">
+                <option value="upper-right">Upper Right</option>
+                <option value="lower-right">Lower Right</option>
+                <option value="upper-left">Upper Left</option>
+                <option value="lower-left">Lower Left</option>
+                <option value="center-right">Center Right (Default)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="customization-section">
+            <h3>📐 Layout Tools</h3>
+            <div class="customization-row">
+              <label>Enable Drag/Resize:</label>
+              <input type="checkbox" id="enable-drag-resize">
+            </div>
+          </div>
+
+          <div class="customization-section">
+            <h3>🏆 Tournament Bracket Position</h3>
+            <div class="customization-row">
+              <label>Bracket Position:</label>
+              <select id="tournament-bracket-position">
+                <option value="upper-right">Upper Right</option>
+                <option value="lower-right">Lower Right</option>
+                <option value="upper-left">Upper Left</option>
+                <option value="lower-left">Lower Left</option>
+                <option value="center-right">Center Right (Default)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="customization-section">
+            <h3>🎠 Bonus List Carousel</h3>
+            <div class="customization-row">
+              <label>Carousel Control:</label>
+              <div class="carousel-controls">
+                <button class="carousel-control pause-btn" id="carousel-pause" title="Pause/Play">⏸️</button>
+                <button class="carousel-control speed-btn" id="carousel-speed" title="Speed: Normal">🏃</button>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Colors Tab -->
@@ -657,6 +767,10 @@
             <div class="customization-row">
               <label>Text Color:</label>
               <input type="color" id="text-color" value="#ffffff">
+            </div>
+            <div class="customization-row">
+              <label>Card Background:</label>
+              <input type="color" id="card-background-color" value="#2a2b3d">
             </div>
           </div>
 
@@ -779,6 +893,12 @@
           <div class="customization-section">
             <h3>💬 Twitch Chat</h3>
             <div class="customization-row">
+              <label>
+                <input type="checkbox" id="hide-chat-toggle" checked> 
+                Hide Chat Box
+              </label>
+            </div>
+            <div class="customization-row">
               <label>Twitch Channel Name:</label>
               <input type="text" id="twitch-channel-input" placeholder="Enter your Twitch channel name">
               <small>Enter just the channel name (e.g., "yourchannelname")</small>
@@ -825,6 +945,24 @@
               <button class="theme-preset theme-black-sky" data-theme="black-sky">🌌 Black Sky</button>
             </div>
           </div>
+
+          <div class="customization-section">
+            <h3>✨ Premium Themes</h3>
+            <div class="theme-presets">
+              <button class="theme-preset theme-cyber-purple" data-theme="cyber-purple">🔮 Cyber Purple</button>
+              <button class="theme-preset theme-ocean-blue" data-theme="ocean-blue">🌊 Ocean Blue</button>
+              <button class="theme-preset theme-sunset-orange" data-theme="sunset-orange">🌅 Sunset Orange</button>
+              <button class="theme-preset theme-forest-green" data-theme="forest-green">🌲 Forest Green</button>
+              <button class="theme-preset theme-midnight-purple" data-theme="midnight-purple">🌙 Midnight Purple</button>
+              <button class="theme-preset theme-lava-red" data-theme="lava-red">🌋 Lava Red</button>
+              <button class="theme-preset theme-ice-blue" data-theme="ice-blue">❄️ Ice Blue</button>
+              <button class="theme-preset theme-toxic-green" data-theme="toxic-green">☢️ Toxic Green</button>
+              <button class="theme-preset theme-royal-gold" data-theme="royal-gold">👑 Royal Gold</button>
+              <button class="theme-preset theme-wine-lovers" data-theme="wine-lovers">🍷 Wine Lovers</button>
+              <button class="theme-preset theme-matrix-green" data-theme="matrix-green">💻 Matrix Green</button>
+              <button class="theme-preset theme-synthwave" data-theme="synthwave">🎮 Synthwave</button>
+            </div>
+          </div>
           
           <div class="customization-section">
             <h3>🖼️ Background Patterns</h3>
@@ -847,6 +985,18 @@
                 <option value="stripe-neon-green">Neon Green Stripes</option>
                 <option value="rainbow-gradient">Rainbow Gradient</option>
                 <option value="black-sky">Black Sky (Night)</option>
+                <option value="animated-waves">🌊 Animated Waves</option>
+                <option value="particle-field">✨ Particle Field</option>
+                <option value="matrix-rain">💚 Matrix Rain</option>
+                <option value="cyber-grid">🔷 Cyber Grid</option>
+                <option value="plasma-wave">🌈 Plasma Wave</option>
+                <option value="hexagon-pattern">⬡ Hexagon Pattern</option>
+                <option value="constellation">⭐ Constellation</option>
+                <option value="northern-lights">🌌 Northern Lights</option>
+                <option value="fire-gradient">🔥 Fire Gradient</option>
+                <option value="ocean-depth">🌊 Ocean Depth</option>
+                <option value="sunset-sky">🌅 Sunset Sky</option>
+                <option value="space-nebula">🪐 Space Nebula</option>
               </select>
             </div>
             <div class="customization-row">
@@ -862,302 +1012,5 @@
       </div>
     </div>
   </div>
-
-  <style>
-    .customization-panel {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0, 0, 0, 0.8);
-      backdrop-filter: blur(10px);
-      z-index: 9999;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    
-    .customization-content {
-      background: linear-gradient(135deg, #23243a 0%, #2d2e4a 100%);
-      border-radius: 20px;
-      border: 2px solid #00e1ff;
-      width: 90%;
-      max-width: 900px;
-      max-height: 90vh;
-      overflow: hidden;
-      box-shadow: 0 20px 40px rgba(0, 225, 255, 0.3);
-      display: flex;
-      flex-direction: column;
-    }
-    
-    .customization-header {
-      padding: 20px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      flex-shrink: 0;
-    }
-    
-    .customization-header h2 {
-      color: #00e1ff;
-      margin: 0;
-      font-size: 1.5rem;
-    }
-    
-    .customization-close {
-      background: rgba(255, 69, 58, 0.9);
-      color: white;
-      border: none;
-      border-radius: 50%;
-      width: 30px;
-      height: 30px;
-      font-size: 18px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: all 0.3s ease;
-    }
-    
-    .customization-close:hover {
-      background: rgba(255, 69, 58, 1);
-      transform: scale(1.1);
-    }
-    
-    .customization-tabs {
-      display: flex;
-      background: rgba(0, 0, 0, 0.2);
-      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-      flex-shrink: 0;
-    }
-    
-    .tab-btn {
-      flex: 1;
-      padding: 15px 10px;
-      background: transparent;
-      border: none;
-      color: rgba(255, 255, 255, 0.7);
-      cursor: pointer;
-      transition: all 0.3s ease;
-      border-bottom: 2px solid transparent;
-      font-size: 0.9rem;
-      font-weight: 500;
-    }
-    
-    .tab-btn:hover {
-      background: rgba(255, 255, 255, 0.1);
-      color: #fff;
-    }
-    
-    .tab-btn.active {
-      background: rgba(0, 225, 255, 0.1);
-      color: #00e1ff;
-      border-bottom-color: #00e1ff;
-    }
-    
-    .customization-body {
-      flex: 1;
-      overflow-y: auto;
-      padding: 0;
-    }
-    
-    .tab-content {
-      display: none;
-      padding: 20px;
-      height: 100%;
-    }
-    
-    .tab-content.active {
-      display: block;
-    }
-    
-    .customization-section {
-      margin-bottom: 30px;
-      padding: 15px;
-      background: rgba(255, 255, 255, 0.05);
-      border-radius: 12px;
-      border: 1px solid rgba(255, 255, 255, 0.1);
-    }
-    
-    .customization-section h3 {
-      color: #9346ff;
-      margin: 0 0 15px 0;
-      font-size: 1.1rem;
-    }
-    
-    .customization-row {
-      display: flex;
-      align-items: center;
-      margin-bottom: 15px;
-      gap: 15px;
-    }
-    
-    .customization-row label {
-      color: white;
-      min-width: 120px;
-      font-weight: 500;
-    }
-    
-    .customization-row input[type="text"],
-    .customization-row input[type="url"],
-    .customization-row select {
-      flex: 1;
-      padding: 8px 12px;
-      background: rgba(0, 0, 0, 0.3);
-      color: white;
-      border: 1px solid #00e1ff;
-      border-radius: 6px;
-      font-size: 14px;
-    }
-    
-    .customization-row input[type=\"color\"] {
-      width: 50px;
-      height: 35px;
-      border: 1px solid #00e1ff;
-      border-radius: 6px;
-      background: none;
-      cursor: pointer;
-    }
-    
-    .customization-row small {
-      color: rgba(255, 255, 255, 0.6);
-      font-size: 12px;
-      margin-top: 4px;
-      width: 100%;
-    }
-    
-    .customization-row:has(small) {
-      flex-direction: column;
-      align-items: flex-start;
-    }
-    
-    .customization-row:has(small) > div {
-      display: flex;
-      align-items: center;
-      gap: 15px;
-      width: 100%;
-    }
-    
-    .custom-file-btn, .custom-reset-btn, .custom-apply-btn {
-      padding: 8px 16px;
-      border-radius: 6px;
-      border: none;
-      cursor: pointer;
-      font-size: 14px;
-      font-weight: 500;
-      transition: all 0.3s ease;
-    }
-    
-    .custom-file-btn, .custom-apply-btn {
-      background: linear-gradient(135deg, #9346ff, #7c3aed);
-      color: white;
-    }
-    
-    .custom-file-btn:hover, .custom-apply-btn:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 4px 12px rgba(147, 70, 255, 0.4);
-    }
-    
-    .custom-reset-btn {
-      background: rgba(255, 69, 58, 0.9);
-      color: white;
-    }
-    
-    .custom-reset-btn:hover {
-      background: rgba(255, 69, 58, 1);
-      transform: translateY(-2px);
-    }
-    
-    .theme-presets {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-      gap: 10px;
-    }
-    
-    .theme-preset {
-      padding: 12px 10px;
-      border: 2px solid transparent;
-      border-radius: 8px;
-      background: rgba(255, 255, 255, 0.1);
-      color: white;
-      cursor: pointer;
-      transition: all 0.3s ease;
-      font-weight: 600;
-      font-size: 13px;
-    }
-    
-    .theme-preset:hover, .theme-preset.active {
-      border-color: #00e1ff;
-      transform: translateY(-2px);
-      box-shadow: 0 4px 12px rgba(0, 225, 255, 0.3);
-    }
-    
-    /* Heavy Theme Button Styles */
-    .theme-gold {
-      background: linear-gradient(135deg, #b45309, #fbbf24);
-      border-color: #fcd34d;
-    }
-    
-    .theme-grey-red {
-      background: linear-gradient(135deg, #6b7280, #dc2626);
-      border-color: #ef4444;
-    }
-    
-    .theme-black-red {
-      background: linear-gradient(135deg, #000000, #991b1b);
-      border-color: #dc2626;
-    }
-    
-    .theme-chrome {
-      background: linear-gradient(135deg, #6b7280, #d1d5db);
-      border-color: #f3f4f6;
-      color: #1f2937;
-      font-weight: 700;
-    }
-    
-    .theme-neon-blue {
-      background: linear-gradient(135deg, #0369a1, #22d3ee);
-      border-color: #22d3ee;
-      box-shadow: 0 0 15px rgba(34, 211, 238, 0.5);
-    }
-    
-    .theme-neon-pink {
-      background: linear-gradient(135deg, #9f1239, #f472b6);
-      border-color: #f472b6;
-      box-shadow: 0 0 15px rgba(244, 114, 182, 0.5);
-    }
-    
-    .theme-neon-green {
-      background: linear-gradient(135deg, #047857, #34d399);
-      border-color: #34d399;
-      box-shadow: 0 0 15px rgba(52, 211, 153, 0.5);
-    }
-    
-    .theme-rainbow {
-      background: linear-gradient(135deg, #f97316, #ec4899, #8b5cf6, #06b6d4);
-      border-color: #a78bfa;
-      box-shadow: 0 0 15px rgba(167, 139, 250, 0.5);
-      animation: rainbow-pulse 3s ease-in-out infinite;
-    }
-    
-    @keyframes rainbow-pulse {
-      0%, 100% { box-shadow: 0 0 15px rgba(249, 115, 22, 0.5); }
-      25% { box-shadow: 0 0 15px rgba(236, 72, 153, 0.5); }
-      50% { box-shadow: 0 0 15px rgba(139, 92, 246, 0.5); }
-      75% { box-shadow: 0 0 15px rgba(6, 182, 212, 0.5); }
-      background: rgba(0, 225, 255, 0.2);
-      transform: translateY(-2px);
-    }
-    
-    .customization-footer {
-      padding: 20px;
-      border-top: 1px solid rgba(255, 255, 255, 0.1);
-      display: flex;
-      gap: 15px;
-      justify-content: center;
-    }
-  </style>
 </body>
 </html>

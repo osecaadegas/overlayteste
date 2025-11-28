@@ -149,12 +149,25 @@ class StreamerOverlayApp {
       const randomSlotActive = randomSlotBtn && randomSlotBtn.classList.contains('active');
       const tournamentActive = tournamentBtn && tournamentBtn.classList.contains('active');
       
+      const bonusStatsPanel = document.getElementById('bonus-stats-panel');
+      const bonusList = document.querySelector('.info-section.bonus-list');
+      
       if (infoPanel) {
         if (tournamentActive) {
+          // Hide bonus list during tournament
+          if (bonusList) bonusList.style.display = 'none';
+          if (bonusStatsPanel) bonusStatsPanel.style.display = 'none';
+          // Hide info panel during tournament setup
           infoPanel.classList.remove('info-panel--visible');
         } else if (bhActive || boActive || randomSlotActive) {
+          // Show bonus hunt stats panel and bonus list
+          if (bonusStatsPanel && bhActive) bonusStatsPanel.style.display = 'flex';
+          if (bonusList) bonusList.style.display = 'block';
           infoPanel.classList.add('info-panel--visible');
         } else {
+          // Hide everything
+          if (bonusStatsPanel) bonusStatsPanel.style.display = 'none';
+          if (bonusList) bonusList.style.display = 'block';
           infoPanel.classList.remove('info-panel--visible');
         }
       }
@@ -442,7 +455,7 @@ class StreamerOverlayApp {
       });
 
       const saveStreamerName = () => {
-        const newName = streamerNameInput.value.trim() || 'Osecaadegas95';
+        const newName = streamerNameInput.value.trim() || 'Streamer';
         streamerName.textContent = newName;
         localStorage.setItem('customStreamerName', newName);
         streamerNameInput.style.display = 'none';
@@ -992,7 +1005,7 @@ class StreamerOverlayApp {
       
       if (chatIframe && emptyChatCard) {
         // Show loading state
-        emptyChatCard.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #9ca3af;">Connecting to Twitch...</div>';
+        emptyChatCard.innerHTML = '<div class="chat-connecting">Connecting to Twitch...</div>';
         emptyChatCard.style.display = 'flex';
         loadChatBtn.textContent = 'Loading...';
         loadChatBtn.disabled = true;
@@ -1107,6 +1120,14 @@ class StreamerOverlayApp {
     });
   }
 
+  hideSelectedSlot() {
+    // Hide any visible selected slot display (compatibility method)
+    const selectedSlotDisplay = document.querySelector('.selected-slot-display');
+    if (selectedSlotDisplay) {
+      selectedSlotDisplay.style.display = 'none';
+    }
+  }
+
   // Public API methods
   getModule(name) {
     return this.modules[name];
@@ -1127,5 +1148,119 @@ if (document.readyState === 'loading') {
   app.init();
 }
 
+// Apply grid layout to customization panel
+const style = document.createElement('style');
+style.textContent = `
+  .tab-content.active {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    align-items: start;
+  }
+  .customization-section {
+    margin-bottom: 0 !important;
+    padding: 12px !important;
+    height: fit-content;
+  }
+  .customization-section h3 {
+    margin: 0 0 10px 0 !important;
+    font-size: 0.95rem !important;
+    font-weight: 600 !important;
+  }
+  .customization-row {
+    margin-bottom: 10px !important;
+    gap: 10px !important;
+  }
+  .customization-row:last-child {
+    margin-bottom: 0 !important;
+  }
+  .customization-row label {
+    min-width: 100px !important;
+    font-size: 0.9rem !important;
+  }
+  .customization-row input[type="text"],
+  .customization-row input[type="url"],
+  .customization-row select {
+    padding: 6px 10px !important;
+    font-size: 0.85rem !important;
+  }
+  .customization-row input[type="color"] {
+    width: 45px !important;
+    height: 30px !important;
+  }
+  .custom-file-btn, .custom-reset-btn, .custom-apply-btn {
+    padding: 6px 12px !important;
+    font-size: 0.85rem !important;
+  }
+`;
+document.head.appendChild(style);
+
 // Make app globally accessible
 window.streamerApp = app;
+
+// Giveaway Button Handler
+document.addEventListener('DOMContentLoaded', () => {
+  const giveawayBtn = document.getElementById('giveaway-btn');
+  console.log('Giveaway button found:', !!giveawayBtn);
+  
+  if (giveawayBtn) {
+    giveawayBtn.addEventListener('click', () => {
+      console.log('Giveaway button clicked');
+      console.log('window.giveawayWheel exists:', !!window.giveawayWheel);
+      
+      // Toggle giveaway panel visibility
+      if (window.giveawayWheel) {
+        const panel = document.getElementById('giveaway-panel');
+        if (panel && (panel.style.display === 'none' || !panel.style.display)) {
+          window.giveawayWheel.showGiveawayPanel();
+          giveawayBtn.classList.add('active');
+          
+          // Remove 'active' from all other sidebar buttons
+          document.querySelectorAll('.sidebar-btn').forEach(btn => {
+            if (btn !== giveawayBtn) btn.classList.remove('active');
+          });
+          
+          // Hide other panels
+          const infoPanel = document.querySelector('.info-panel');
+          const middlePanel = document.getElementById('middle-panel');
+          const randomSlotPanel = document.getElementById('random-slot-panel');
+          const tournamentPanel = document.getElementById('tournament-panel');
+          
+          if (infoPanel) infoPanel.classList.remove('info-panel--visible');
+          if (middlePanel) middlePanel.style.display = 'none';
+          if (randomSlotPanel) randomSlotPanel.style.display = 'none';
+          if (tournamentPanel) tournamentPanel.style.display = 'none';
+        } else {
+          window.giveawayWheel.hideGiveawayPanel();
+          giveawayBtn.classList.remove('active');
+        }
+      } else {
+        console.error('Giveaway wheel not initialized, trying to initialize...');
+        // Try to initialize if not already done
+        if (typeof GiveawayWheel !== 'undefined') {
+          try {
+            window.giveawayWheel = new GiveawayWheel();
+            // Retry showing panel after a brief delay
+            setTimeout(() => {
+              if (window.giveawayWheel) {
+                window.giveawayWheel.showGiveawayPanel();
+                giveawayBtn.classList.add('active');
+                
+                // Remove 'active' from all other sidebar buttons
+                document.querySelectorAll('.sidebar-btn').forEach(btn => {
+                  if (btn !== giveawayBtn) btn.classList.remove('active');
+                });
+              }
+            }, 200);
+          } catch (error) {
+            console.error('Error initializing GiveawayWheel:', error);
+          }
+        } else {
+          console.error('GiveawayWheel class not found - script may not have loaded');
+        }
+      }
+    });
+  } else {
+    console.error('Giveaway button not found in DOM');
+  }
+});

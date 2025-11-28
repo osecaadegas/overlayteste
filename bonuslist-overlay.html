@@ -57,49 +57,88 @@
       border-radius: 0 0 12px 12px;
       padding: 20px;
       position: relative;
-      max-height: 800px;
+      min-height: 200px;
       overflow: hidden;
     }
 
-    .gradient-overlay-top,
-    .gradient-overlay-bottom {
-      position: absolute;
-      left: 0;
-      right: 0;
-      height: 40px;
-      pointer-events: none;
-      z-index: 2;
+    .single-bonus-container {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
     }
 
-    .gradient-overlay-top {
-      top: 0;
-      background: linear-gradient(to bottom, rgba(26, 27, 46, 0.95), transparent);
+    .bonus-navigation {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+      width: 100%;
     }
 
-    .gradient-overlay-bottom {
-      bottom: 0;
-      background: linear-gradient(to top, rgba(26, 27, 46, 0.95), transparent);
+    .nav-button {
+      background: linear-gradient(135deg, rgba(147, 70, 255, 0.3), rgba(0, 225, 255, 0.3));
+      border: 2px solid rgba(147, 70, 255, 0.5);
+      border-radius: 8px;
+      color: #fff;
+      padding: 8px 12px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.3s ease;
+      font-size: 14px;
+    }
+
+    .nav-button:hover {
+      background: linear-gradient(135deg, rgba(147, 70, 255, 0.5), rgba(0, 225, 255, 0.5));
+      transform: translateY(-1px);
+    }
+
+    .nav-button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .bonus-counter {
+      color: #9ca3af;
+      font-size: 14px;
+      font-weight: 600;
     }
 
     .bonus-list {
       list-style: none;
+      width: 100%;
       display: flex;
-      flex-direction: column;
-      gap: 15px;
-      padding: 10px 5px;
+      justify-content: center;
     }
 
-    .bonus-list.carousel-active {
-      animation: scrollUp linear infinite;
+    .auto-cycle-controls {
+      margin-top: 15px;
+      text-align: center;
     }
 
-    @keyframes scrollUp {
-      0% {
-        transform: translateY(0);
-      }
-      100% {
-        transform: translateY(-33.333%);
-      }
+    .auto-cycle-btn {
+      background: linear-gradient(135deg, rgba(147, 70, 255, 0.3), rgba(0, 225, 255, 0.3));
+      border: 2px solid rgba(147, 70, 255, 0.5);
+      border-radius: 8px;
+      color: #fff;
+      padding: 6px 12px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 12px;
+      transition: all 0.3s ease;
+    }
+
+    .auto-cycle-btn.active {
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.3), rgba(34, 197, 94, 0.3));
+      border-color: rgba(16, 185, 129, 0.5);
+    }
+
+    .auto-cycle-btn:hover {
+      transform: translateY(-1px);
     }
 
     .bonus-item {
@@ -215,15 +254,27 @@
       <h2>🎰 Bonus List</h2>
     </div>
     <div class="carousel-container">
-      <div class="gradient-overlay-top"></div>
-      <ul class="bonus-list" id="bonus-list">
-        <div class="empty-state" id="empty-state">
-          <div class="empty-state-icon">🎰</div>
-          <div class="empty-state-text">No bonuses yet</div>
-          <div class="empty-state-subtext">Waiting for bonuses from main window...</div>
+      <div class="single-bonus-container">
+        <div class="bonus-navigation" id="bonus-navigation" style="display: none;">
+          <button class="nav-button" id="prev-btn">← Previous</button>
+          <div class="bonus-counter">
+            <span id="current-index">1</span> of <span id="total-bonuses">1</span>
+          </div>
+          <button class="nav-button" id="next-btn">Next →</button>
         </div>
-      </ul>
-      <div class="gradient-overlay-bottom"></div>
+        
+        <ul class="bonus-list" id="bonus-list">
+          <div class="empty-state" id="empty-state">
+            <div class="empty-state-icon">🎰</div>
+            <div class="empty-state-text">No bonuses yet</div>
+            <div class="empty-state-subtext">Waiting for bonuses from main window...</div>
+          </div>
+        </ul>
+        
+        <div class="auto-cycle-controls" id="auto-cycle-controls" style="display: none;">
+          <button class="auto-cycle-btn" id="auto-cycle-btn">▶ Auto Cycle (5s)</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -269,26 +320,60 @@
       return defaultImage;
     }
 
+    // Single bonus display variables
+    let currentBonusIndex = 0;
+    let allBonuses = [];
+    let autoCycleInterval = null;
+    let autoCycleEnabled = false;
+
     function renderBonusList(bonuses) {
       const bonusListEl = document.getElementById('bonus-list');
       const emptyStateEl = document.getElementById('empty-state');
+      const navigationEl = document.getElementById('bonus-navigation');
+      const autoCycleControlsEl = document.getElementById('auto-cycle-controls');
+      
+      allBonuses = bonuses || [];
       
       if (!bonuses || bonuses.length === 0) {
         emptyStateEl.style.display = 'block';
-        bonusListEl.classList.remove('carousel-active');
+        navigationEl.style.display = 'none';
+        autoCycleControlsEl.style.display = 'none';
+        currentBonusIndex = 0;
+        clearAutoCycle();
         return;
       }
       
       emptyStateEl.style.display = 'none';
-      bonusListEl.innerHTML = '';
+      
+      // Show navigation and controls if more than one bonus
+      if (bonuses.length > 1) {
+        navigationEl.style.display = 'flex';
+        autoCycleControlsEl.style.display = 'block';
+      } else {
+        navigationEl.style.display = 'none';
+        autoCycleControlsEl.style.display = 'none';
+        clearAutoCycle();
+      }
+      
+      // Ensure current index is valid
+      if (currentBonusIndex >= bonuses.length) {
+        currentBonusIndex = 0;
+      }
+      
+      displayCurrentBonus();
+      updateNavigationState();
+    }
 
-      bonuses.forEach(bonus => {
-        const li = document.createElement('li');
-        li.className = `bonus-item${bonus.isSuper ? ' super-slot' : ''}`;
-        
-        const slotImage = getSlotImage(bonus.slot);
-        
-        li.innerHTML = `
+    function displayCurrentBonus() {
+      const bonusListEl = document.getElementById('bonus-list');
+      
+      if (!allBonuses || allBonuses.length === 0) return;
+      
+      const bonus = allBonuses[currentBonusIndex];
+      const slotImage = getSlotImage(bonus.slot);
+      
+      bonusListEl.innerHTML = `
+        <li class="bonus-item${bonus.isSuper ? ' super-slot' : ''}">
           <img src="${slotImage}" alt="${bonus.slot}" class="bonus-slot-image">
           <div class="bonus-info-section">
             <div class="bonus-slot-name">${bonus.slot}</div>
@@ -309,30 +394,70 @@
               </div>
             </div>
           </div>
-        `;
-        
-        bonusListEl.appendChild(li);
-      });
+        </li>
+      `;
+    }
 
-      // Setup carousel if more than 2 items
-      if (bonuses.length > 2) {
-        const originalItems = Array.from(bonusListEl.querySelectorAll('.bonus-item'));
-        
-        // Clone all items twice for seamless infinite loop
-        for (let i = 0; i < 2; i++) {
-          originalItems.forEach(item => {
-            const clone = item.cloneNode(true);
-            bonusListEl.appendChild(clone);
-          });
-        }
-        
-        bonusListEl.classList.add('carousel-active');
-        
-        // Calculate animation duration based on number of items
-        const duration = bonuses.length * 3; // 3 seconds per item
-        bonusListEl.style.animationDuration = `${duration}s`;
+    function updateNavigationState() {
+      if (!allBonuses || allBonuses.length <= 1) return;
+      
+      const prevBtn = document.getElementById('prev-btn');
+      const nextBtn = document.getElementById('next-btn');
+      const currentIndexEl = document.getElementById('current-index');
+      const totalBonusesEl = document.getElementById('total-bonuses');
+      
+      currentIndexEl.textContent = currentBonusIndex + 1;
+      totalBonusesEl.textContent = allBonuses.length;
+      
+      // Enable/disable navigation buttons (optional - remove if you want infinite cycling)
+      // prevBtn.disabled = currentBonusIndex === 0;
+      // nextBtn.disabled = currentBonusIndex === allBonuses.length - 1;
+    }
+
+    function navigateToNext() {
+      if (!allBonuses || allBonuses.length <= 1) return;
+      
+      currentBonusIndex = (currentBonusIndex + 1) % allBonuses.length;
+      displayCurrentBonus();
+      updateNavigationState();
+    }
+
+    function navigateToPrevious() {
+      if (!allBonuses || allBonuses.length <= 1) return;
+      
+      currentBonusIndex = currentBonusIndex === 0 ? allBonuses.length - 1 : currentBonusIndex - 1;
+      displayCurrentBonus();
+      updateNavigationState();
+    }
+
+    function toggleAutoCycle() {
+      const autoCycleBtn = document.getElementById('auto-cycle-btn');
+      
+      if (autoCycleEnabled) {
+        clearAutoCycle();
+        autoCycleBtn.textContent = '▶ Auto Cycle (5s)';
+        autoCycleBtn.classList.remove('active');
       } else {
-        bonusListEl.classList.remove('carousel-active');
+        startAutoCycle();
+        autoCycleBtn.textContent = '⏸ Auto Cycle (5s)';
+        autoCycleBtn.classList.add('active');
+      }
+    }
+
+    function startAutoCycle() {
+      if (autoCycleInterval) clearInterval(autoCycleInterval);
+      
+      autoCycleEnabled = true;
+      autoCycleInterval = setInterval(() => {
+        navigateToNext();
+      }, 5000); // 5 seconds per bonus
+    }
+
+    function clearAutoCycle() {
+      autoCycleEnabled = false;
+      if (autoCycleInterval) {
+        clearInterval(autoCycleInterval);
+        autoCycleInterval = null;
       }
     }
 
@@ -343,9 +468,45 @@
       const currentDataString = localStorage.getItem('bonusHuntData') || '';
       if (currentDataString !== lastDataString) {
         lastDataString = currentDataString;
-        renderBonusList(loadBonuses());
+        const newBonuses = loadBonuses();
+        
+        // Try to maintain the current position if possible
+        if (allBonuses.length > 0 && newBonuses.length > 0) {
+          const currentBonus = allBonuses[currentBonusIndex];
+          if (currentBonus) {
+            // Find the same bonus in the new list
+            const newIndex = newBonuses.findIndex(bonus => 
+              bonus.slot === currentBonus.slot && 
+              bonus.bet === currentBonus.bet
+            );
+            if (newIndex !== -1) {
+              currentBonusIndex = newIndex;
+            } else if (currentBonusIndex >= newBonuses.length) {
+              currentBonusIndex = Math.max(0, newBonuses.length - 1);
+            }
+          }
+        }
+        
+        renderBonusList(newBonuses);
       }
     }
+
+    // Set up navigation event listeners
+    document.getElementById('prev-btn').addEventListener('click', navigateToPrevious);
+    document.getElementById('next-btn').addEventListener('click', navigateToNext);
+    document.getElementById('auto-cycle-btn').addEventListener('click', toggleAutoCycle);
+
+    // Keyboard navigation
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowLeft') {
+        navigateToPrevious();
+      } else if (e.key === 'ArrowRight') {
+        navigateToNext();
+      } else if (e.key === ' ') {
+        e.preventDefault();
+        toggleAutoCycle();
+      }
+    });
 
     // Initial load
     renderBonusList(loadBonuses());

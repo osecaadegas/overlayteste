@@ -163,7 +163,7 @@ function applyUIColors(primary, accent, background, text) {
   }
   
   // Apply glass effect to card elements only when enabled
-  const cardElements = document.querySelectorAll('.info-section, .bonus-hunt-stat, .slot-card, .slot-highlight-card, .info-panel');
+  const cardElements = document.querySelectorAll('.info-section, .bonus-hunt-stat, .slot-card, .slot-highlight-card, .info-panel, .bonus-stats-panel-inline, .stat-card, .tournament-left-panel, .middle-panel, .bonus-list-header, .carousel-container, .stats-panel-content, .stats-panel-header, .tournament-bracket');
   cardElements.forEach(card => {
     if (glassEnabled) {
       const adjustedOpacity = Math.min(parseFloat(glassOpacity) + 0.3, 0.95);
@@ -178,8 +178,69 @@ function applyUIColors(primary, accent, background, text) {
     }
   });
   
+  // Apply accent color to bonus list header and statistics
+  const bonusListHeaders = document.querySelectorAll('.bonus-list-header h4, .stats-panel-header h3, .stat-label');
+  bonusListHeaders.forEach(header => {
+    header.style.color = accent;
+  });
+  
+  const statsValues = document.querySelectorAll('.stat-value');
+  statsValues.forEach(value => {
+    value.style.color = accent;
+  });
+  
+  // Apply colors to tournament bracket elements
+  const tournamentHeaders = document.querySelectorAll('.bracket-title-row h4, .column-header');
+  tournamentHeaders.forEach(header => {
+    header.style.color = accent;
+    header.style.borderColor = primary;
+  });
+  
+  const matchVS = document.querySelectorAll('.match-vs');
+  matchVS.forEach(vs => {
+    vs.style.color = accent;
+  });
+  
+  const participantNames = document.querySelectorAll('.participant-name');
+  participantNames.forEach(name => {
+    name.style.color = text;
+  });
+  
+  // Apply card background to tournament bracket cards
+  const bracketCards = document.querySelectorAll('.bracket-match-horizontal, .bracket-match, .bracket-participant');
+  bracketCards.forEach(card => {
+    const cardBg = hexToRgb(cardBackgroundColor);
+    if (glassEnabled) {
+      const adjustedOpacity = Math.min(parseFloat(glassOpacity) + 0.2, 0.9);
+      card.style.background = `rgba(${cardBg.r}, ${cardBg.g}, ${cardBg.b}, ${adjustedOpacity})`;
+    } else {
+      card.style.background = `rgb(${cardBg.r}, ${cardBg.g}, ${cardBg.b})`;
+    }
+    card.style.borderColor = `rgba(${hexToRgb(accent).r}, ${hexToRgb(accent).g}, ${hexToRgb(accent).b}, 0.4)`;
+  });
+  
   console.log('Applied custom color scheme to all UI elements');
 }
+
+// Function to refresh tournament bracket styling when themes change
+window.refreshTournamentBracketStyling = function refreshTournamentBracketStyling() {
+  const cardBackgroundColor = localStorage.getItem('customCardBackground') || '#2a2b3d';
+  const accentColor = localStorage.getItem('customAccentColor') || '#00e1ff';
+  const glassEnabled = localStorage.getItem('glassBackgroundsEnabled') === 'true';
+  const glassOpacity = localStorage.getItem('glassOpacity') || '0.1';
+  
+  const bracketCards = document.querySelectorAll('.bracket-match-horizontal, .bracket-match, .bracket-participant, .tournament-complete');
+  bracketCards.forEach(card => {
+    const cardBg = hexToRgb(cardBackgroundColor);
+    if (glassEnabled) {
+      const adjustedOpacity = Math.min(parseFloat(glassOpacity) + 0.2, 0.9);
+      card.style.background = `rgba(${cardBg.r}, ${cardBg.g}, ${cardBg.b}, ${adjustedOpacity})`;
+    } else {
+      card.style.background = `rgb(${cardBg.r}, ${cardBg.g}, ${cardBg.b})`;
+    }
+    card.style.borderColor = `rgba(${hexToRgb(accentColor).r}, ${hexToRgb(accentColor).g}, ${hexToRgb(accentColor).b}, 0.4)`;
+  });
+};
 
 function applyColorScheme(primary, accent, background, text) {
   const root = document.documentElement;
@@ -1018,20 +1079,97 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // Giveaway Button Logic
+  const giveawayBtn = document.getElementById('giveaway-btn');
+  console.log('Giveaway button found:', !!giveawayBtn);
+  if (giveawayBtn) {
+    giveawayBtn.addEventListener('click', () => {
+      console.log('Giveaway button clicked');
+      console.log('window.giveawayWheel exists:', !!window.giveawayWheel);
+      
+      // Toggle giveaway panel visibility
+      if (window.giveawayWheel) {
+        const panel = document.getElementById('giveaway-panel');
+        if (panel.style.display === 'none' || !panel.style.display) {
+          window.giveawayWheel.showGiveawayPanel();
+          giveawayBtn.classList.add('active');
+          
+          // Remove 'active' from all other sidebar buttons
+          document.querySelectorAll('.sidebar-btn').forEach(btn => {
+            if (btn !== giveawayBtn) btn.classList.remove('active');
+          });
+          
+          // Hide other panels
+          if (infoPanel) infoPanel.classList.remove('info-panel--visible');
+          if (middlePanel) middlePanel.style.display = 'none';
+          if (randomSlotPanel) randomSlotPanel.style.display = 'none';
+          if (tournamentPanel) tournamentPanel.style.display = 'none';
+          
+          panelVisible = false;
+          randomSlotPanelVisible = false;
+          tournamentPanelVisible = false;
+        } else {
+          window.giveawayWheel.hideGiveawayPanel();
+          giveawayBtn.classList.remove('active');
+        }
+      } else {
+        console.error('Giveaway wheel not initialized, trying to initialize...');
+        // Try to initialize if not already done
+        if (typeof GiveawayWheel !== 'undefined') {
+          try {
+            window.giveawayWheel = new GiveawayWheel();
+            // Retry showing panel after a brief delay
+            setTimeout(() => {
+              if (window.giveawayWheel) {
+                window.giveawayWheel.showGiveawayPanel();
+                giveawayBtn.classList.add('active');
+                
+                // Remove 'active' from all other sidebar buttons
+                document.querySelectorAll('.sidebar-btn').forEach(btn => {
+                  if (btn !== giveawayBtn) btn.classList.remove('active');
+                });
+                
+                // Hide other panels
+                if (infoPanel) infoPanel.classList.remove('info-panel--visible');
+                if (middlePanel) middlePanel.style.display = 'none';
+                if (randomSlotPanel) randomSlotPanel.style.display = 'none';
+                if (tournamentPanel) tournamentPanel.style.display = 'none';
+                
+                panelVisible = false;
+                randomSlotPanelVisible = false;
+                tournamentPanelVisible = false;
+              }
+            }, 200);
+          } catch (error) {
+            console.error('Error initializing GiveawayWheel:', error);
+          }
+        } else {
+          console.error('GiveawayWheel class not found - script may not have loaded');
+        }
+      }
+    });
+  }
+
   const adInput = document.getElementById('ad-image-input');
   const logoUploadInput = document.getElementById('logo-upload-input');
   const navbarLogo = document.getElementById('navbar-logo');
 
   // Image upload functionality with draggable and resizable display
-  adInput.addEventListener('change', (e) => {
+  adInput.addEventListener('change', () => {
     const file = adInput.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = function(evt) {
+    if (!file) return;
+    const fileKind = file.type.split('/')[0]; // 'image' or 'video'
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      // Use unified media creator (supports image & video); fallback to image creator
+      if (typeof createDraggableMedia === 'function') {
+        createDraggableMedia(evt.target.result, fileKind === 'video' ? 'video' : 'image');
+      } else {
         createDraggableImage(evt.target.result);
-      };
-      reader.readAsDataURL(file);
-    }
+      }
+      adInput.value = '';
+    };
+    reader.readAsDataURL(file);
   });
 
   // Logo upload functionality
@@ -1145,7 +1283,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
       if (confirm('Reset streamer name to default?')) {
-        streamerNameSpan.textContent = 'Osecaadegas95';
+        streamerNameSpan.textContent = 'Streamer';
         localStorage.removeItem('customStreamerName');
       }
     });
@@ -1235,8 +1373,8 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
       if (confirm('Reset website URL to default?')) {
-        websiteLink.href = 'https://osecaadegas.github.io/95/';
-        websiteText.textContent = 'osecaadegas.github.io/95/';
+        websiteLink.href = '#';
+        websiteText.textContent = 'Your Website';
         localStorage.removeItem('customWebsiteUrl');
         localStorage.removeItem('customWebsiteText');
       }
@@ -1480,6 +1618,133 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     console.log('Created draggable and resizable image');
+  }
+
+  // Unified draggable media (image/video) with layer controls & lock awareness
+  function createDraggableMedia(src, type = 'image') {
+    if (!src) return;
+    const mediaContainer = document.createElement('div');
+    mediaContainer.className = 'draggable-image-container';
+    mediaContainer.style.position = 'absolute';
+    mediaContainer.style.left = '100px';
+    mediaContainer.style.top = '100px';
+    mediaContainer.style.zIndex = '1000';
+    mediaContainer.style.display = 'inline-block';
+    mediaContainer.style.cursor = window.isDragLocked ? 'default' : 'move';
+
+    let mediaEl;
+    if (type === 'video') {
+      mediaEl = document.createElement('video');
+      mediaEl.src = src;
+      mediaEl.autoplay = true;
+      mediaEl.loop = true;
+      mediaEl.muted = true;
+      mediaEl.playsInline = true;
+      mediaEl.controls = !window.isDragLocked;
+      mediaEl.style.maxWidth = '600px';
+      mediaEl.style.maxHeight = '400px';
+      mediaEl.style.display = 'block';
+    } else {
+      mediaEl = document.createElement('img');
+      mediaEl.src = src;
+      mediaEl.alt = 'Uploaded Media';
+      mediaEl.style.maxWidth = '400px';
+      mediaEl.style.display = 'block';
+    }
+    mediaEl.className = 'draggable-image';
+
+    const controls = document.createElement('div');
+    controls.className = 'image-controls';
+    controls.style.display = window.isDragLocked ? 'none' : 'flex';
+    controls.innerHTML = `
+      <button class="layer-btn layer-up" title="Move Forward">↑</button>
+      <button class="layer-btn layer-down" title="Move Back">↓</button>
+      ${type === 'video' ? '<button class="layer-btn loop-btn active" title="Loop On/Off">🔁</button>' : ''}
+      <span class="layer-display">Layer: 1000</span>
+      <button class="close-btn" title="Remove">×</button>
+    `;
+
+    const resizeHandle = document.createElement('div');
+    resizeHandle.className = 'resize-handle';
+    resizeHandle.style.display = window.isDragLocked ? 'none' : 'block';
+
+    mediaContainer.appendChild(mediaEl);
+    mediaContainer.appendChild(controls);
+    mediaContainer.appendChild(resizeHandle);
+    document.body.appendChild(mediaContainer);
+
+    // Draggable / Resizable logic
+    let isDragging = false, isResizing = false;
+    let startX = 0, startY = 0, startLeft = 0, startTop = 0, startW = 0, startH = 0;
+
+    mediaContainer.addEventListener('mousedown', (e) => {
+      if (window.isDragLocked) return;
+      if (e.target.closest('.close-btn') || e.target.closest('.layer-btn')) return;
+      if (e.target === resizeHandle) {
+        isResizing = true;
+        startX = e.clientX; startY = e.clientY;
+        startW = mediaContainer.offsetWidth; startH = mediaContainer.offsetHeight;
+        e.preventDefault();
+        return;
+      }
+      isDragging = true;
+      startX = e.clientX; startY = e.clientY;
+      startLeft = mediaContainer.offsetLeft; startTop = mediaContainer.offsetTop;
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (window.isDragLocked) return;
+      if (isResizing) {
+        const dw = e.clientX - startX; const dh = e.clientY - startY;
+        const newW = Math.max(100, startW + dw);
+        const newH = Math.max(100, startH + dh);
+        mediaContainer.style.width = newW + 'px';
+        mediaContainer.style.height = newH + 'px';
+        mediaEl.style.width = '100%';
+        mediaEl.style.height = '100%';
+        mediaEl.style.objectFit = 'contain';
+        return;
+      }
+      if (!isDragging) return;
+      mediaContainer.style.left = startLeft + (e.clientX - startX) + 'px';
+      mediaContainer.style.top = startTop + (e.clientY - startY) + 'px';
+    });
+
+    document.addEventListener('mouseup', () => { isDragging = false; isResizing = false; });
+
+    // Layer controls
+    const layerDisplay = controls.querySelector('.layer-display');
+    controls.querySelector('.layer-up').addEventListener('click', (e) => {
+      e.stopPropagation();
+      let z = parseInt(mediaContainer.style.zIndex) || 1000;
+      z += 10; mediaContainer.style.zIndex = z; layerDisplay.textContent = 'Layer: ' + z;
+    });
+    controls.querySelector('.layer-down').addEventListener('click', (e) => {
+      e.stopPropagation();
+      let z = parseInt(mediaContainer.style.zIndex) || 1000;
+      z = Math.max(1, z - 10); mediaContainer.style.zIndex = z; layerDisplay.textContent = 'Layer: ' + z;
+    });
+    if (type === 'video') {
+      const loopBtn = controls.querySelector('.loop-btn');
+      loopBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        mediaEl.loop = !mediaEl.loop;
+        loopBtn.classList.toggle('active', mediaEl.loop);
+        loopBtn.style.opacity = mediaEl.loop ? '1' : '0.5';
+      });
+    }
+    controls.querySelector('.close-btn').addEventListener('click', () => mediaContainer.remove());
+
+    // React to lock state periodically
+    const lockInterval = setInterval(() => {
+      const locked = window.isDragLocked;
+      mediaContainer.style.cursor = locked ? 'default' : 'move';
+      controls.style.display = locked ? 'none' : 'flex';
+      resizeHandle.style.display = locked ? 'none' : 'block';
+      if (type === 'video') mediaEl.controls = !locked;
+    }, 300);
+    const origRemove = mediaContainer.remove;
+    mediaContainer.remove = function() { clearInterval(lockInterval); origRemove.call(this); };
   }
 
   // Focus bet size after pressing Enter in slot name
@@ -4370,6 +4635,8 @@ class DragHandler {
       '.bottom-panel',
       '.tournament-panel',
       '.tournament-control-panel',
+      '.tournament-left-panel',
+      '.tournament-bracket',
       '.draggable-image-container'
     ];
 
@@ -4412,12 +4679,24 @@ class DragHandler {
       return;
     }
     
-    // Don't drag if clicking on interactive elements or sidebar buttons
-    const interactiveElements = ['INPUT', 'BUTTON', 'SELECT', 'TEXTAREA', 'A', 'LABEL'];
-    if (interactiveElements.includes(e.target.tagName) || 
-        e.target.closest('input, button, select, textarea, a, label') ||
-        e.target.closest('.sidebar-btn')) {
-      return;
+    // For info-panel, tournament-left-panel, and tournament-bracket, be more permissive - only block clicks directly on buttons/inputs/links
+    if (element.classList.contains('info-panel') || element.classList.contains('tournament-left-panel') || element.classList.contains('tournament-bracket')) {
+      const interactiveElements = ['BUTTON', 'INPUT', 'SELECT', 'TEXTAREA', 'A', 'IFRAME'];
+      if (interactiveElements.includes(e.target.tagName)) {
+        return;
+      }
+      // Also check if we're clicking inside the list items themselves
+      if (e.target.closest('li, button, input, select, textarea, a, iframe')) {
+        return;
+      }
+    } else {
+      // For other panels, use stricter rules
+      const interactiveElements = ['INPUT', 'BUTTON', 'SELECT', 'TEXTAREA', 'A', 'LABEL'];
+      if (interactiveElements.includes(e.target.tagName) || 
+          e.target.closest('input, button, select, textarea, a, label') ||
+          e.target.closest('.sidebar-btn')) {
+        return;
+      }
     }
     
     e.preventDefault();
@@ -4430,6 +4709,9 @@ class DragHandler {
     element.style.position = 'absolute';
     element.style.left = rect.left + 'px';
     element.style.top = rect.top + 'px';
+    element.style.right = 'auto';
+    element.style.bottom = 'auto';
+    element.style.transform = 'none';
     
     // Get touch or mouse position
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
@@ -4690,6 +4972,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (websiteColorInput) {
       websiteColorInput.value = localStorage.getItem('customWebsiteColor') || '#ffffff';
+    }
+    if (cardBackgroundInput) {
+      cardBackgroundInput.value = localStorage.getItem('customCardBackground') || '#2a2b3d';
     }
     if (gambleAwareColorInput) {
       gambleAwareColorInput.value = localStorage.getItem('customGambleAwareColor') || '#ffffff';
@@ -5175,6 +5460,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const accentColor = document.getElementById('accent-color')?.value;
     const backgroundColor = document.getElementById('background-color')?.value;
     const textColor = document.getElementById('text-color')?.value;
+    const cardBackgroundColor = document.getElementById('card-background-color')?.value;
     const streamerNameColor = document.getElementById('streamer-name-color')?.value;
     const websiteColor = document.getElementById('website-color')?.value;
     const gambleAwareColor = document.getElementById('gamble-aware-color')?.value;
@@ -5228,6 +5514,7 @@ document.addEventListener('DOMContentLoaded', () => {
     localStorage.setItem('customAccentColor', accentColor);
     localStorage.setItem('customBackgroundColor', backgroundColor);
     localStorage.setItem('customTextColor', textColor);
+    localStorage.setItem('customCardBackground', cardBackgroundColor);
     localStorage.setItem('customStreamerNameColor', streamerNameColor);
     localStorage.setItem('customWebsiteColor', websiteColor);
     localStorage.setItem('customGambleAwareColor', gambleAwareColor);
@@ -5461,6 +5748,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const accentColorInput = document.getElementById('accent-color');
       const backgroundColorInput = document.getElementById('background-color');
       const textColorInput = document.getElementById('text-color');
+      const cardBackgroundInput = document.getElementById('card-background-color');
       const streamerNameColorInput = document.getElementById('streamer-name-color');
       const websiteColorInput = document.getElementById('website-color');
       const gambleAwareColorInput = document.getElementById('gamble-aware-color');
@@ -5469,12 +5757,19 @@ document.addEventListener('DOMContentLoaded', () => {
       if (accentColorInput) accentColorInput.value = selectedTheme.accent;
       if (backgroundColorInput) backgroundColorInput.value = selectedTheme.background;
       if (textColorInput) textColorInput.value = selectedTheme.text;
+      if (cardBackgroundInput) cardBackgroundInput.value = selectedTheme.cardBg;
       if (streamerNameColorInput) streamerNameColorInput.value = selectedTheme.streamerName;
       if (websiteColorInput) websiteColorInput.value = selectedTheme.website;
       if (gambleAwareColorInput) gambleAwareColorInput.value = selectedTheme.gambleAware;
       
+      // Store the cardBg value in localStorage so it gets used
+      localStorage.setItem('customCardBackground', selectedTheme.cardBg);
+      
       // Apply the theme immediately
       applyColorScheme(selectedTheme.primary, selectedTheme.accent, selectedTheme.background, selectedTheme.text);
+      
+      // Refresh tournament bracket styling after theme change
+      setTimeout(refreshTournamentBracketStyling, 100);
     }
   }
   
@@ -5511,6 +5806,8 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log('Re-applying background image after UI color update...');
         applyBackgroundImage(backgroundImage);
       }
+      // Refresh tournament bracket styling
+      refreshTournamentBracketStyling();
     });
   }
   
@@ -5591,7 +5888,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Add the main circle image
     if (!sidebarToggle.innerHTML.trim()) {
-      sidebarToggle.innerHTML = '<img src="./assets/maincircle.png" alt="Main" style="width: 50px; height: 50px; display: block;">';
+      sidebarToggle.innerHTML = '<img src="./assets/maincircle.png" alt="Main" class="sidebar-toggle-image">';
     }
     
     console.log('Main button styled and ready');
