@@ -218,6 +218,92 @@
           </div>        </div>
       </section>
 
+      <!-- Modern BH Panel (for modern sidebar layout) -->
+      <section class="modern-bh-panel" id="modern-bh-panel" style="display:none;">
+        <button class="modern-close-btn" id="close-modern-bh-panel" type="button">
+          <span>✕</span>
+        </button>
+        <div class="modern-panel-header">
+          <h3>BH Panel</h3>
+        </div>
+        
+        <div class="modern-grid-container">
+          <!-- Row 1 -->
+          <div class="modern-field-row">
+            <div class="modern-field">
+              <label class="modern-field-label">Start Money</label>
+              <input type="number" id="modern-start-money-input" class="modern-field-input" placeholder="Start Money" min="0" step="any" />
+            </div>
+            <div class="modern-field">
+              <label class="modern-field-label">Stop Money</label>
+              <input type="number" id="modern-stop-money-input" class="modern-field-input" placeholder="Stop Money" min="0" step="any" />
+            </div>
+          </div>
+          
+          <!-- Row 2 -->
+          <div class="modern-field-row">
+            <div class="modern-field">
+              <label class="modern-field-label">Actual Balance</label>
+              <input type="number" id="modern-actual-balance-input" class="modern-field-input" placeholder="Current balance" min="0" step="any" />
+            </div>
+            <div class="modern-field">
+              <label class="modern-field-label">Total Spent</label>
+              <input type="number" id="modern-total-spent-input" class="modern-field-input" placeholder="0.00" min="0" step="any" readonly />
+            </div>
+          </div>
+          
+          <!-- Row 3 -->
+          <div class="modern-field-row">
+            <div class="modern-field">
+              <label class="modern-field-label">Slot Name</label>
+              <div style="position: relative;">
+                <input type="text" id="modern-slot-name-input" class="modern-field-input" placeholder="Slot Name" />
+                <div class="slot-suggestion-box" style="display: none;"></div>
+              </div>
+            </div>
+            <div class="modern-field">
+              <label class="modern-field-label">Bet Size</label>
+              <input type="number" id="modern-bet-size-input" class="modern-field-input" placeholder="Enter bet size" min="0" step="any" />
+            </div>
+          </div>
+          
+          <!-- Add Slot Button -->
+          <div class="modern-add-slot-row">
+            <button class="modern-add-slot-btn" id="modern-add-slot-btn" type="button">
+              ➕ Slot
+            </button>
+          </div>
+          
+          <!-- Super Bonus -->
+          <div class="modern-super-row">
+            <label class="modern-super-checkbox">
+              <input type="checkbox" id="modern-super-checkbox" />
+              <span class="modern-checkbox-custom"></span>
+              <span class="modern-super-text">Super</span>
+            </label>
+          </div>
+        </div>
+        
+        <div class="modern-panel-row" id="modern-slot-img-url-row" style="display: none;">
+          <label class="modern-input-label">Slot Image URL</label>
+          <input type="url" id="modern-slot-img-url-input" class="modern-input" placeholder="Paste image URL here" />
+        </div>
+        
+        <div class="modern-panel-actions">
+          <div class="action-buttons-grid">
+            <button class="modern-action-btn slot-image-btn" id="modern-slot-img-url-btn" type="button">
+              🖼️ Slot Image
+            </button>
+            <button class="modern-action-btn edit-slots-btn" id="modern-edit-slots-btn">
+              ✏️ Edit Slots
+            </button>
+            <button class="modern-action-btn bonus-opening-btn" id="modern-bonus-opening-btn">
+              ▶️ Bonus Opening
+            </button>
+          </div>
+        </div>
+      </section>
+
       <!-- Bonus Opening Panel (hidden by default, shown when Bonus Opening is clicked) -->
       <section class="middle-panel" id="bonus-opening-panel" style="display:none;">
         <div class="middle-panel-title">Bonus Opening</div>
@@ -226,6 +312,20 @@
         </div>
         <div class="bonus-opening-actions">
           <button class="middle-btn" id="close-bonus-opening-btn">Close</button>
+        </div>
+      </section>
+
+      <!-- Modern Bonus Opening Panel -->
+      <section class="modern-bonus-opening-panel" id="modern-bonus-opening-panel" style="display:none;">
+        <div class="modern-panel-header">
+          <div class="panel-icon">▶️</div>
+          <h3>Modern Bonus Opening</h3>
+        </div>
+        <div id="modern-bonus-opening-list" class="modern-bonus-opening-list">
+          <!-- Modern bonus opening items will be dynamically populated here -->
+        </div>
+        <div class="modern-bonus-opening-actions">
+          <button class="modern-action-btn" id="close-modern-bonus-opening-btn">Close</button>
         </div>
       </section>
 
@@ -547,22 +647,6 @@
               </div>
             </div>
             <div class="stat-card">
-              <div class="stat-icon">🎰</div>
-              <div class="stat-info">
-                <div class="stat-label">Best Slot</div>
-                <div class="stat-value" id="bh-stat-best">--</div>
-                <div class="stat-subvalue" id="bh-stat-best-value">€0.00</div>
-              </div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-icon">💀</div>
-              <div class="stat-info">
-                <div class="stat-label">Worst Slot</div>
-                <div class="stat-value" id="bh-stat-worst">--</div>
-                <div class="stat-subvalue" id="bh-stat-worst-value">€0.00</div>
-              </div>
-            </div>
-            <div class="stat-card">
               <div class="stat-icon">🎲</div>
               <div class="stat-info">
                 <div class="stat-label">Total Bonuses</div>
@@ -583,9 +667,24 @@
                 <div class="stat-value" id="bh-stat-req-multi">0.00x</div>
               </div>
             </div>
+            <div class="stat-card">
+              <div class="stat-icon">🎰</div>
+              <div class="stat-info">
+                <div class="stat-label">Best Slot</div>
+                <div class="stat-value" id="bh-stat-best">--</div>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon">💀</div>
+              <div class="stat-info">
+                <div class="stat-label">Worst Slot</div>
+                <div class="stat-value" id="bh-stat-worst">--</div>
+              </div>
+            </div>
           </div>
         </div>
-        <div class="info-section bonus-list">
+        <!-- Classic Bonus List -->
+        <div class="info-section bonus-list classic-layout" id="bonus-list-classic">
           <div class="bonus-list-inner-container">
             <div class="bonus-list-header">
               <h4>Bonus List</h4>
@@ -593,7 +692,7 @@
             <div class="carousel-container">
               <div class="gradient-overlay-top"></div>
               <ul></ul> <!-- Enhanced carousel will be applied to this list -->
-              <div class="empty-state" id="bonus-list-empty" style="display: none;">
+              <div class="empty-state" id="bonus-list-empty-classic" style="display: none;">
                 <div class="empty-state-icon">🎰</div>
                 <div class="empty-state-text">No bonuses yet</div>
                 <div class="empty-state-subtext">Add a slot to get started</div>
@@ -603,7 +702,31 @@
           </div>
           <div class="carousel-indicators">
             <div class="progress-bar">
-              <div class="progress-fill" id="carousel-progress"></div>
+              <div class="progress-fill" id="carousel-progress-classic"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Modern Bonus List -->
+        <div class="info-section bonus-list modern-layout" id="bonus-list-modern" style="display: none;">
+          <div class="bonus-list-inner-container">
+            <div class="bonus-list-header">
+              <h4>🎠 Modern Bonus List</h4>
+            </div>
+            <div class="carousel-container">
+              <div class="gradient-overlay-top"></div>
+              <ul></ul>
+              <div class="empty-state" id="bonus-list-empty-modern" style="display: none;">
+                <div class="empty-state-icon">🎰</div>
+                <div class="empty-state-text">No bonuses yet</div>
+                <div class="empty-state-subtext">Add a slot to get started</div>
+              </div>
+              <div class="gradient-overlay-bottom"></div>
+            </div>
+          </div>
+          <div class="carousel-indicators">
+            <div class="progress-bar">
+              <div class="progress-fill" id="carousel-progress-modern"></div>
             </div>
           </div>
         </div>
@@ -612,6 +735,122 @@
           <div class="twitch-chat-container" id="twitch-chat-container">
             <div class="empty-chat-card" id="empty-chat-card"></div>
             <iframe id="twitch-chat-iframe" style="display: none;" width="100%" height="340" frameborder="0" scrolling="no"></iframe>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Modern Bonus Hunt Sidebar -->
+      <aside class="modern-bonus-sidebar" id="modern-bonus-sidebar" style="display: none;">
+        <!-- Statistics Card -->
+        <div class="stats-card">
+          <div class="stats-header">
+            <div class="stats-icon">📊</div>
+            <h3>Bonus Hunt Statistics</h3>
+          </div>
+          <div class="stats-grid">
+            <div class="stat-item">
+              <div class="stat-icon">💰</div>
+              <div class="stat-content">
+                <div class="stat-label">START MONEY</div>
+                <div class="stat-value" id="modern-stat-start">€0.00</div>
+              </div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-icon">🎯</div>
+              <div class="stat-content">
+                <div class="stat-label">TARGET MONEY</div>
+                <div class="stat-value" id="modern-stat-target">€0.00</div>
+              </div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-icon">💵</div>
+              <div class="stat-content">
+                <div class="stat-label">CURRENT BALANCE</div>
+                <div class="stat-value" id="modern-stat-current">€0.00</div>
+              </div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-icon">💸</div>
+              <div class="stat-content">
+                <div class="stat-label">TOTAL SPENT</div>
+                <div class="stat-value" id="modern-stat-spent">€0.00</div>
+              </div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-icon">📈</div>
+              <div class="stat-content">
+                <div class="stat-label">TOTAL PROFIT/LOSS</div>
+                <div class="stat-value" id="modern-stat-profit">€0.00</div>
+              </div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-icon">🎲</div>
+              <div class="stat-content">
+                <div class="stat-label">TOTAL BONUSES</div>
+                <div class="stat-value" id="modern-stat-bonuses">0</div>
+              </div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-icon">📉</div>
+              <div class="stat-content">
+                <div class="stat-label">AVERAGE MULTIPLIER</div>
+                <div class="stat-value" id="modern-stat-avg-mult">0.00x</div>
+              </div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-icon">🚀</div>
+              <div class="stat-content">
+                <div class="stat-label">REQUIRED MULTIPLIER</div>
+                <div class="stat-value" id="modern-stat-req-mult">0.00x</div>
+              </div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-icon">🎰</div>
+              <div class="stat-content">
+                <div class="stat-label">BEST SLOT</div>
+                <div class="stat-value" id="modern-stat-best">--</div>
+                <div class="stat-subvalue" id="modern-stat-best-value">€0.00</div>
+              </div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-icon">💀</div>
+              <div class="stat-content">
+                <div class="stat-label">WORST SLOT</div>
+                <div class="stat-value" id="modern-stat-worst">--</div>
+                <div class="stat-subvalue" id="modern-stat-worst-value">€0.00</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Modern Bonus List Card -->
+        <div class="modern-bonus-card">
+          <div class="bonus-card-header">
+            <div class="bonus-header-icon">🎠</div>
+            <h3>MODERN BONUS LIST</h3>
+          </div>
+          <div class="modern-slot-preview" id="modern-slot-preview" style="display: none;">
+            <div class="preview-header">
+              <span class="preview-icon">🎯</span>
+              <span class="preview-title">Current Opening</span>
+            </div>
+            <div class="preview-content">
+              <div class="preview-slot-card">
+                <img id="preview-slot-image" class="preview-image" src="" alt="Current Slot">
+                <div class="preview-overlay">
+                  <div class="preview-name" id="preview-slot-name">Slot Name</div>
+                  <div class="preview-stats">
+                    <span class="preview-bet" id="preview-slot-bet">€0.00</span>
+                    <span class="preview-counter" id="preview-slot-counter">1/1</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="modern-bonus-carousel">
+            <div class="modern-bonus-items" id="modern-bonus-items">
+              <!-- Bonus items will be rendered here -->
+            </div>
           </div>
         </div>
       </aside>
@@ -737,7 +976,15 @@
           </div>
 
           <div class="customization-section">
-            <h3>🎠 Bonus List Carousel</h3>
+            <h3>🎠 Bonus List Settings</h3>
+            <div class="customization-row">
+              <label>Layout Style:</label>
+              <select id="bonus-list-layout-select">
+                <option value="classic">📋 Classic Layout</option>
+                <option value="modern-card">🎠 Modern Card Layout</option>
+                <option value="modern-sidebar">🎆 Modern Sidebar</option>
+              </select>
+            </div>
             <div class="customization-row">
               <label>Carousel Control:</label>
               <div class="carousel-controls">

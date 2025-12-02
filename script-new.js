@@ -152,15 +152,24 @@ class StreamerOverlayApp {
       const bonusStatsPanel = document.getElementById('bonus-stats-panel');
       const bonusList = document.querySelector('.info-section.bonus-list');
       
+      // Check if we're using modern sidebar layout
+      const isModernSidebar = window.bonusHuntManager && 
+                             window.bonusHuntManager.currentLayout === 'modern-sidebar';
+      
       if (infoPanel) {
-        if (tournamentActive) {
+        if (isModernSidebar) {
+          // Modern sidebar layout: always keep info panel hidden
+          if (bonusStatsPanel) bonusStatsPanel.style.display = 'none';
+          if (bonusList) bonusList.style.display = 'none';
+          infoPanel.classList.remove('info-panel--visible');
+        } else if (tournamentActive) {
           // Hide bonus list during tournament
           if (bonusList) bonusList.style.display = 'none';
           if (bonusStatsPanel) bonusStatsPanel.style.display = 'none';
           // Hide info panel during tournament setup
           infoPanel.classList.remove('info-panel--visible');
         } else if (bhActive || boActive || randomSlotActive) {
-          // Show bonus hunt stats panel and bonus list
+          // Show bonus hunt stats panel and bonus list (for classic/modern card layouts)
           if (bonusStatsPanel && bhActive) bonusStatsPanel.style.display = 'flex';
           if (bonusList) bonusList.style.display = 'block';
           infoPanel.classList.add('info-panel--visible');
@@ -176,13 +185,39 @@ class StreamerOverlayApp {
     // Bonus Hunt button
     if (bhBtn && middlePanel) {
       bhBtn.addEventListener('click', () => {
-        panelVisible = !panelVisible;
-        middlePanel.style.display = panelVisible ? 'flex' : 'none';
-        bhBtn.classList.toggle('active', panelVisible);
-        if (panelVisible) makePanelInteractive(middlePanel);
-        
-        if (!panelVisible) {
-          this.hideSelectedSlot();
+        // Use the BonusHuntManager's toggleBHPanel method if available
+        if (window.bonusHuntManager && window.bonusHuntManager.toggleBHPanel) {
+          window.bonusHuntManager.toggleBHPanel();
+          
+          // Check visibility state based on current layout
+          if (window.bonusHuntManager.currentLayout === 'modern-sidebar') {
+            const modernSidebar = document.getElementById('modern-bonus-sidebar');
+            panelVisible = modernSidebar && modernSidebar.style.display === 'flex';
+          } else {
+            panelVisible = middlePanel.style.display === 'flex';
+          }
+          
+          bhBtn.classList.toggle('active', panelVisible);
+          
+          if (!panelVisible) {
+            this.hideSelectedSlot();
+          }
+          
+          // Update info panel visibility based on layout
+          updateInfoPanelVisibility();
+        } else {
+          // Fallback to original behavior
+          panelVisible = !panelVisible;
+          middlePanel.style.display = panelVisible ? 'flex' : 'none';
+          bhBtn.classList.toggle('active', panelVisible);
+          if (panelVisible) makePanelInteractive(middlePanel);
+          
+          if (!panelVisible) {
+            this.hideSelectedSlot();
+          }
+          
+          // Update info panel visibility
+          updateInfoPanelVisibility();
         }
         
         if (randomSlotPanel && panelVisible) {
@@ -326,6 +361,32 @@ class StreamerOverlayApp {
           });
         });
       });
+
+      // Bonus list layout selector
+      const bonusLayoutSelect = document.getElementById('bonus-list-layout-select');
+      if (bonusLayoutSelect) {
+        console.log('🎛️ Setting up bonus layout selector');
+        bonusLayoutSelect.addEventListener('change', () => {
+          const selectedLayout = bonusLayoutSelect.value;
+          console.log('🔄 Layout selector changed to:', selectedLayout);
+          
+          // Use global method for better reliability
+          if (window.switchBonusLayout) {
+            window.switchBonusLayout(selectedLayout);
+          } else if (window.bonusHuntManager && window.bonusHuntManager.switchLayout) {
+            window.bonusHuntManager.switchLayout(selectedLayout);
+          } else {
+            console.warn('⚠️ No layout switching method available');
+          }
+        });
+        
+        // Set initial value from saved preference
+        const savedLayout = localStorage.getItem('bonusLayoutMode') || 'classic';
+        bonusLayoutSelect.value = savedLayout;
+        console.log('✅ Initialized layout selector with:', savedLayout);
+      } else {
+        console.warn('⚠️ Bonus layout selector not found in DOM');
+      }
     }
 
     // Lock/Unlock button
