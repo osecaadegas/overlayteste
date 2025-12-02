@@ -7,13 +7,62 @@ class BonusHuntManager {
     this.totalPayout = 0;
     this.customSlotImages = {}; // Store custom image URLs
     this.currentBonusOpeningIndex = 0; // Track current bonus in opening panel
+    this.currentBonusIndex = null; // Track active bonus for pulsing effect
+    this.isEnteringPayout = false; // Track if we're in payout entry mode
     this.init();
   }
 
   init() {
     console.log('Bonus Hunt Manager initialized');
+    this.currentLayout = localStorage.getItem('bonusLayoutMode') || 'classic';
+    console.log('🎯 Current layout from storage:', this.currentLayout);
     this.setupEventListeners();
     // Don't load saved bonuses - start fresh on each page load
+    
+    // Ensure all panels start hidden
+    this.hideAllPanelsOnInit();
+    
+    // Apply saved layout after a small delay to ensure DOM is ready
+    setTimeout(() => {
+      console.log('🔄 Applying layout after DOM ready...');
+      this.switchLayout(this.currentLayout);
+      
+      // Also trigger the customization panel update if it exists
+      const layoutSelect = document.getElementById('bonus-list-layout-select');
+      if (layoutSelect && layoutSelect.value !== this.currentLayout) {
+        layoutSelect.value = this.currentLayout;
+      }
+    }, 200);
+    
+    // Force initial statistics refresh after a short delay
+    setTimeout(() => {
+      this.refreshAllStatistics();
+    }, 1000);
+  }
+
+  hideAllPanelsOnInit() {
+    // Ensure all panels are hidden when page loads
+    const classicBHPanel = document.getElementById('middle-panel');
+    const modernBHPanel = document.getElementById('modern-bh-panel');
+    const modernSidebar = document.getElementById('modern-bonus-sidebar');
+    const classicBonusOpening = document.getElementById('bonus-opening-panel');
+    const modernBonusOpening = document.getElementById('modern-bonus-opening-panel');
+    const infoPanel = document.querySelector('.info-panel');
+    const bonusStatsPanel = document.getElementById('bonus-stats-panel');
+    
+    if (classicBHPanel) classicBHPanel.style.display = 'none';
+    if (modernBHPanel) modernBHPanel.style.display = 'none';
+    if (modernSidebar) modernSidebar.style.display = 'none';
+    if (classicBonusOpening) classicBonusOpening.style.display = 'none';
+    if (modernBonusOpening) modernBonusOpening.style.display = 'none';
+    if (infoPanel) infoPanel.classList.remove('info-panel--visible');
+    if (bonusStatsPanel) bonusStatsPanel.style.display = 'none';
+    
+    // Reset BH button state
+    const bhBtn = document.getElementById('bh-btn');
+    if (bhBtn) bhBtn.classList.remove('active');
+    
+    console.log('🚫 All panels hidden on initialization');
   }
 
   setupEventListeners() {
@@ -98,18 +147,37 @@ class BonusHuntManager {
     // Start money and stop money inputs for stats bar
     const startMoneyInput = document.getElementById('start-money-input');
     const stopMoneyInput = document.getElementById('stop-money-input');
-    if (startMoneyInput) {
-      startMoneyInput.addEventListener('input', () => this.updateStatsBar());
-    }
-    if (stopMoneyInput) {
-      stopMoneyInput.addEventListener('input', () => this.updateStatsBar());
-    }
-
-    // Actual balance input
     const actualBalanceInput = document.getElementById('actual-balance-input');
-    if (actualBalanceInput) {
-      actualBalanceInput.addEventListener('input', () => this.updateStatsBar());
-    }
+    const totalSpentInput = document.getElementById('total-spent-input');
+    
+    // Comprehensive input event listeners for all balance-related inputs
+    const balanceInputs = [startMoneyInput, stopMoneyInput, actualBalanceInput, totalSpentInput];
+    
+    balanceInputs.forEach(input => {
+      if (input) {
+        // Add multiple event types to catch all changes
+        ['input', 'change', 'keyup', 'paste', 'cut'].forEach(eventType => {
+          input.addEventListener(eventType, () => {
+            // Small delay to ensure DOM is updated for paste/cut events
+            setTimeout(() => {
+              this.updateStatsBar();
+              // Also trigger calculator update if available
+              if (window.bonusHuntUI) {
+                window.bonusHuntUI.onBonusDataChanged();
+              }
+            }, 10);
+          });
+        });
+        
+        // Also listen for focus/blur events
+        input.addEventListener('blur', () => {
+          this.updateStatsBar();
+          if (window.bonusHuntUI) {
+            window.bonusHuntUI.onBonusDataChanged();
+          }
+        });
+      }
+    });
 
     // Slot image URL button
     const slotImgUrlBtn = document.getElementById('slot-img-url-btn');
@@ -134,6 +202,8 @@ class BonusHuntManager {
       addSlotBtn.addEventListener('click', () => this.addBonus());
     }
 
+    // Modern panel event listeners
+    this.setupModernPanelEventListeners();
   }
 
   handleSlotNameInput() {
@@ -178,6 +248,58 @@ class BonusHuntManager {
         this.showSelectedSlot(slot);
         
         const betSizeInput = document.getElementById('bet-size-input');
+        if (betSizeInput) {
+          setTimeout(() => betSizeInput.focus(), 100);
+        }
+      });
+      
+      suggestionBox.appendChild(item);
+    });
+
+    suggestionBox.style.display = 'block';
+  }
+
+  handleModernSlotNameInput() {
+    const slotNameInput = document.getElementById('modern-slot-name-input');
+    const suggestionBox = document.querySelector('.modern-grid-container .slot-suggestion-box');
+    
+    if (!slotNameInput || !suggestionBox) return;
+
+    const value = slotNameInput.value.trim();
+    if (value.length < 3) {
+      suggestionBox.style.display = 'none';
+      return;
+    }
+
+    let matches = [];
+    if (typeof window.slotDatabase !== 'undefined' && window.slotDatabase && window.slotDatabase.length > 0) {
+      matches = window.slotDatabase
+        .filter(slot => slot.name.toLowerCase().includes(value.toLowerCase()))
+        .slice(0, 8);
+    }
+
+    if (matches.length === 0) {
+      suggestionBox.style.display = 'none';
+      return;
+    }
+
+    suggestionBox.innerHTML = '';
+    matches.forEach(slot => {
+      const item = document.createElement('div');
+      item.className = 'suggestion-item';
+      item.innerHTML = `
+        <img src="${slot.image}" alt="${slot.name}" class="suggestion-image">
+        <div class="suggestion-info">
+          <div class="suggestion-name">${slot.name}</div>
+          <div class="suggestion-provider">${slot.provider}</div>
+        </div>
+      `;
+      
+      item.addEventListener('click', () => {
+        slotNameInput.value = slot.name;
+        suggestionBox.style.display = 'none';
+        
+        const betSizeInput = document.getElementById('modern-bet-size-input');
         if (betSizeInput) {
           setTimeout(() => betSizeInput.focus(), 100);
         }
@@ -337,10 +459,27 @@ class BonusHuntManager {
   }
 
   renderBonusList() {
-    const bonusListUl = document.querySelector('.bonus-list ul');
+    this.renderBonusCard('#bonus-list-classic');
+    this.renderBonusCard('#bonus-list-modern');
+    this.renderModernSidebar();
+    this.updateBonusListCarousel();
+  }
+
+  renderBonusCard(cardSelector) {
+    const bonusCard = document.querySelector(cardSelector);
+    const bonusListUl = bonusCard ? bonusCard.querySelector('ul') : null;
+    const emptyState = bonusCard ? bonusCard.querySelector('.empty-state') : null;
+    
     if (!bonusListUl) return;
 
     bonusListUl.innerHTML = '';
+
+    if (this.bonuses.length === 0) {
+      if (emptyState) emptyState.style.display = 'block';
+      return;
+    }
+
+    if (emptyState) emptyState.style.display = 'none';
 
     this.bonuses.forEach(bonus => {
       const li = document.createElement('li');
@@ -371,7 +510,6 @@ class BonusHuntManager {
               </div>
             </div>
           </div>
-
         </div>
       `;
 
@@ -382,12 +520,17 @@ class BonusHuntManager {
 
       bonusListUl.appendChild(li);
     });
-
-    this.updateBonusListCarousel();
   }
 
   updateBonusListCarousel() {
-    const bonusListUl = document.querySelector('.bonus-list ul');
+    this.updateCarouselForCard('#bonus-list-classic', 'classic');
+    this.updateCarouselForCard('#bonus-list-modern', 'modern');
+  }
+
+  updateCarouselForCard(cardSelector, layoutType) {
+    const bonusCard = document.querySelector(cardSelector);
+    const bonusListUl = bonusCard ? bonusCard.querySelector('ul') : null;
+    
     if (!bonusListUl) return;
 
     // Remove existing clones first
@@ -398,33 +541,300 @@ class BonusHuntManager {
       // Get original items (not clones)
       const originalItems = Array.from(bonusListUl.querySelectorAll('.bonus-item:not(.bonus-item-clone)'));
       
-      // Clone all items twice for seamless infinite loop
-      const firstCloneSet = originalItems.map(item => {
-        const clone = item.cloneNode(true);
-        clone.classList.add('bonus-item-clone');
-        return clone;
-      });
-      
-      const secondCloneSet = originalItems.map(item => {
-        const clone = item.cloneNode(true);
-        clone.classList.add('bonus-item-clone');
-        return clone;
-      });
-      
-      // Append both clone sets
-      firstCloneSet.forEach(clone => bonusListUl.appendChild(clone));
-      secondCloneSet.forEach(clone => bonusListUl.appendChild(clone));
-      
-      bonusListUl.classList.add('carousel-active');
-      
-      // Calculate animation duration based on number of items
-      const itemCount = originalItems.length;
-      const duration = itemCount * 3; // 3 seconds per item
-      bonusListUl.style.animationDuration = `${duration}s`;
+      if (layoutType === 'modern') {
+        // Modern layout: Create seamless infinite scroll
+        const cloneSet = originalItems.map(item => {
+          const clone = item.cloneNode(true);
+          clone.classList.add('bonus-item-clone');
+          return clone;
+        });
+        
+        // Append clones for seamless loop
+        cloneSet.forEach(clone => bonusListUl.appendChild(clone));
+        
+        bonusListUl.classList.add('carousel-active');
+        
+        // Calculate duration for modern layout (smoother, longer)
+        const duration = Math.max(15, originalItems.length * 2.5);
+        bonusListUl.style.animationDuration = `${duration}s`;
+      } else {
+        // Classic layout: Original implementation
+        const firstCloneSet = originalItems.map(item => {
+          const clone = item.cloneNode(true);
+          clone.classList.add('bonus-item-clone');
+          return clone;
+        });
+        
+        const secondCloneSet = originalItems.map(item => {
+          const clone = item.cloneNode(true);
+          clone.classList.add('bonus-item-clone');
+          return clone;
+        });
+        
+        firstCloneSet.forEach(clone => bonusListUl.appendChild(clone));
+        secondCloneSet.forEach(clone => bonusListUl.appendChild(clone));
+        
+        bonusListUl.classList.add('carousel-active');
+        
+        const duration = originalItems.length * 3;
+        bonusListUl.style.animationDuration = `${duration}s`;
+      }
     } else {
       bonusListUl.classList.remove('carousel-active');
       bonusListUl.style.animationDuration = '';
     }
+  }
+
+  updateActiveSlotInModernSidebar() {
+    const modernBonusItems = document.getElementById('modern-bonus-items');
+    if (!modernBonusItems) return;
+
+    // Remove active class from all items
+    modernBonusItems.querySelectorAll('.modern-bonus-item').forEach(item => {
+      item.classList.remove('active-slot');
+    });
+
+    // Add active class to current bonus if we're entering payout
+    if (this.currentBonusIndex !== null && this.isEnteringPayout) {
+      const activeItems = modernBonusItems.querySelectorAll(`[data-index="${this.currentBonusIndex}"]`);
+      activeItems.forEach(item => {
+        item.classList.add('active-slot');
+      });
+
+      // Pause animation when showing active slot
+      modernBonusItems.style.animationPlayState = 'paused';
+      
+      // Update preview window
+      this.updateModernSlotPreview();
+    } else {
+      // Resume animation when not showing active slot
+      modernBonusItems.style.animationPlayState = 'running';
+      
+      // Hide preview window
+      this.hideModernSlotPreview();
+    }
+  }
+
+  updateModernSlotPreview() {
+    const previewWindow = document.getElementById('modern-slot-preview');
+    const previewImage = document.getElementById('preview-slot-image');
+    const previewName = document.getElementById('preview-slot-name');
+    const previewBet = document.getElementById('preview-slot-bet');
+    const previewCounter = document.getElementById('preview-slot-counter');
+    
+    if (!previewWindow || this.currentBonusIndex === null || !this.bonuses[this.currentBonusIndex]) {
+      return;
+    }
+    
+    const currentBonus = this.bonuses[this.currentBonusIndex];
+    const slotImage = this.getSlotImage(currentBonus.slot);
+    const bet = parseFloat(currentBonus.bet) || 0;
+    
+    // Show and update preview window
+    previewWindow.style.display = 'block';
+    previewImage.src = slotImage;
+    previewImage.onerror = function() {
+      this.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjE0MCIgdmlld0JveD0iMCAwIDEwMCAxNDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIxMDAiIGhlaWdodD0iMTQwIiByeD0iMTIiIGZpbGw9InVybCgjZ3JhZGllbnQwXzFfMSkiLz4KPHN2ZyB4PSIzMCIgeT0iNTAiIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIj4KPHBhdGggZD0iTTEyIDJMMTMuMDkgOC4yNkwyMCA5TDEzLjA5IDE1Ljc0TDEyIDIyTDEwLjkxIDE1Ljc0TDQgOUwxMC45MSA8LjI2TDEyIDJaIiBmaWxsPSIjOTM0NkZGIiBmaWxsLW9wYWNpdHk9IjAuOCIvPgo8L3N2Zz4KPGR4ZWZzPgo8bGluZWFyR3JhZGllbnQgaWQ9ImdyYWRpZW50MF8xXzEiIHgxPSIwIiB5MT0iMCIgeDI9IjEwMCIgeTI9IjE0MCIgZ3JhZGllbnRVbml0cz0idXNlclNwYWNlT25Vc2UiPgo8c3RvcCBzdG9wLWNvbG9yPSIjOTM0NkZGIiBzdG9wLW9wYWNpdHk9IjAuMiIvPgo8c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiMxOTE5MjgiIHN0b3Atb3BhY2l0eT0iMC44Ii8+CjwvbGluZWFyR3JhZGllbnQ+CjwvZGVmcz4KPC9zdmc+Cg==';
+    };
+    previewName.textContent = currentBonus.slot || 'Unknown Slot';
+    previewBet.textContent = `€${bet.toFixed(2)}`;
+    previewCounter.textContent = `${this.currentBonusOpeningIndex + 1}/${this.bonuses.length}`;
+  }
+
+  hideModernSlotPreview() {
+    const previewWindow = document.getElementById('modern-slot-preview');
+    if (previewWindow) {
+      previewWindow.style.display = 'none';
+    }
+  }
+
+  renderModernSidebar() {
+    const modernBonusItems = document.getElementById('modern-bonus-items');
+    if (!modernBonusItems) return;
+
+    modernBonusItems.innerHTML = '';
+
+    if (this.bonuses.length === 0) {
+      modernBonusItems.innerHTML = `
+        <div class="empty-state-modern">
+          <div class="empty-icon">🎰</div>
+          <div class="empty-text">No bonuses yet</div>
+          <div class="empty-subtext">Add slots to get started</div>
+        </div>
+      `;
+      return;
+    }
+
+    // Create items for seamless loop (duplicate items)
+    const itemsToRender = [...this.bonuses, ...this.bonuses];
+
+    itemsToRender.forEach((bonus, index) => {
+      const actualIndex = index >= this.bonuses.length ? index - this.bonuses.length : index;
+      const bonusItem = document.createElement('div');
+      bonusItem.className = `modern-bonus-item${bonus.isSuper ? ' super-slot' : ''}`;
+      bonusItem.dataset.bonusId = bonus.id;
+      bonusItem.dataset.index = actualIndex;
+      
+      const slotImage = this.getSlotImage(bonus.slot);
+      const bet = parseFloat(bonus.bet) || 0;
+      const win = bonus.payout !== null ? parseFloat(bonus.payout) : 0;
+      const multiplier = bonus.multiplier || 0;
+      
+      bonusItem.innerHTML = `
+        <img src="${slotImage}" alt="${bonus.slot}" class="modern-slot-image" 
+             onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNzAiIGhlaWdodD0iNzAiIHZpZXdCb3g9IjAgMCA3MCA3MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjcwIiBoZWlnaHQ9IjcwIiByeD0iMTAiIGZpbGw9InVybCgjZ3JhZGllbnQwXzFfMSkiLz4KPHN2ZyB4PSIxNSIgeT0iMTUiIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIj4KPHBhdGggZD0iTTEyIDJMMTMuMDkgOC4yNkwyMCA5TDEzLjA5IDE1Ljc0TDEyIDIyTDEwLjkxIDE1Ljc0TDQgOUwxMC45MSA4LjI2TDEyIDJaIiBmaWxsPSIjOTM0NkZGIiBmaWxsLW9wYWNpdHk9IjAuOCIvPgo8L3N2Zz4KPGR4ZWZzPgo8bGluZWFyR3JhZGllbnQgaWQ9ImdyYWRpZW50MF8xXzEiIHgxPSIwIiB5MT0iMCIgeDI9IjcwIiB5Mj0iNzAiIGdyYWRpZW50VW5pdHM9InVzZXJTcGFjZU9uVXNlIj4KPHN0b3Agc3RvcC1jb2xvcj0iIzkzNDZGRiIgc3RvcC1vcGFjaXR5PSIwLjIiLz4KPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLW9wYWNpdHk9IjAuOCIvPgo8L2xpbmVhckdyYWRpZW50Pgo8L2RlZnM+Cjwvc3ZnPgo=';">
+        <div class="modern-slot-info">
+          <div class="modern-slot-bet">€${bet.toFixed(2)}</div>
+          <div class="modern-slot-win">${win > 0 ? '€' + win.toFixed(2) : '--'}</div>
+          <div class="modern-slot-mult">${multiplier.toFixed(2)}x</div>
+        </div>
+      `;
+
+      // Add click handler to edit bonus
+      bonusItem.addEventListener('click', () => {
+        this.editBonus(actualIndex);
+      });
+
+      modernBonusItems.appendChild(bonusItem);
+    });
+
+    // Update modern sidebar carousel
+    this.updateModernSidebarCarousel();
+  }
+
+  updateModernSidebarCarousel() {
+    const modernBonusItems = document.getElementById('modern-bonus-items');
+    if (!modernBonusItems || this.bonuses.length <= 3) {
+      if (modernBonusItems) {
+        modernBonusItems.classList.remove('carousel-active');
+        modernBonusItems.style.animationDuration = '';
+      }
+      return;
+    }
+
+    // Clone items for seamless loop
+    const originalItems = Array.from(modernBonusItems.querySelectorAll('.modern-bonus-item:not(.bonus-item-clone)'));
+    const existingClones = modernBonusItems.querySelectorAll('.bonus-item-clone');
+    existingClones.forEach(clone => clone.remove());
+
+    const cloneSet = originalItems.map(item => {
+      const clone = item.cloneNode(true);
+      clone.classList.add('bonus-item-clone');
+      return clone;
+    });
+
+    cloneSet.forEach(clone => modernBonusItems.appendChild(clone));
+    
+    modernBonusItems.classList.add('carousel-active');
+    const duration = Math.max(20, originalItems.length * 3);
+    modernBonusItems.style.animationDuration = `${duration}s`;
+  }
+
+  updateModernSidebarStats() {
+    if (this.currentLayout !== 'modern-sidebar') return;
+    
+    const startMoneyInput = document.getElementById('start-money-input');
+    const stopMoneyInput = document.getElementById('stop-money-input');
+    const actualBalanceInput = document.getElementById('actual-balance-input');
+    
+    const startMoney = startMoneyInput ? parseFloat(startMoneyInput.value) || 0 : 0;
+    const stopMoney = stopMoneyInput ? parseFloat(stopMoneyInput.value) || 0 : 0;
+    const actualBalance = actualBalanceInput ? parseFloat(actualBalanceInput.value) || 0 : 0;
+    
+    // Update modern sidebar statistics
+    this.updateModernStatElement('modern-stat-start', `€${startMoney.toFixed(2)}`);
+    this.updateModernStatElement('modern-stat-target', `€${stopMoney.toFixed(2)}`);
+    this.updateModernStatElement('modern-stat-current', `€${actualBalance.toFixed(2)}`);
+    
+    const totalSpent = startMoney - actualBalance;
+    this.updateModernStatElement('modern-stat-spent', `€${totalSpent.toFixed(2)}`);
+    
+    const profit = actualBalance + this.totalPayout - startMoney;
+    const profitElement = document.getElementById('modern-stat-profit');
+    if (profitElement) {
+      profitElement.textContent = `€${profit.toFixed(2)}`;
+      profitElement.style.color = profit >= 0 ? '#00ffb8' : '#ff5c5c';
+    }
+    
+    this.updateModernStatElement('modern-stat-bonuses', this.bonuses.length.toString());
+    
+    const avgX = this.totalBet > 0 ? (this.totalPayout / this.totalBet) : 0;
+    this.updateModernStatElement('modern-stat-avg-mult', `${avgX.toFixed(2)}x`);
+    
+    const reqX = this.totalBet > 0 ? (this.totalBet / (this.totalBet - this.totalPayout + this.totalBet)) : 0;
+    this.updateModernStatElement('modern-stat-req-mult', `${reqX.toFixed(2)}x`);
+    
+    // Best and worst slots
+    if (this.bonuses.length > 0) {
+      const bestBonus = this.bonuses.reduce((best, bonus) => {
+        return (bonus.payout || 0) > (best.payout || 0) ? bonus : best;
+      });
+      
+      this.updateModernStatElement('modern-stat-best', bestBonus.slot);
+      this.updateModernStatElement('modern-stat-best-value', `€${(bestBonus.payout || 0).toFixed(2)}`);
+      
+      const openedBonuses = this.bonuses.filter(b => b.payout && b.payout > 0);
+      if (openedBonuses.length > 0) {
+        const worstBonus = openedBonuses.reduce((worst, bonus) => {
+          return (bonus.payout || 0) < (worst.payout || 0) ? bonus : worst;
+        });
+        
+        this.updateModernStatElement('modern-stat-worst', worstBonus.slot);
+        this.updateModernStatElement('modern-stat-worst-value', `€${worstBonus.payout.toFixed(2)}`);
+      } else {
+        this.updateModernStatElement('modern-stat-worst', '--');
+        this.updateModernStatElement('modern-stat-worst-value', '€0.00');
+      }
+    } else {
+      this.updateModernStatElement('modern-stat-best', '--');
+      this.updateModernStatElement('modern-stat-best-value', '€0.00');
+      this.updateModernStatElement('modern-stat-worst', '--');
+      this.updateModernStatElement('modern-stat-worst-value', '€0.00');
+    }
+  }
+
+  updateModernStatElement(elementId, value) {
+    const element = document.getElementById(elementId);
+    if (element) {
+      element.textContent = value;
+    }
+  }
+
+  syncPanelInputs() {
+    // Sync values from classic to modern panels
+    const classicInputs = {
+      'start-money-input': 'modern-start-money-input',
+      'stop-money-input': 'modern-stop-money-input',
+      'actual-balance-input': 'modern-actual-balance-input',
+      'total-spent-input': 'modern-total-spent-input',
+      'slot-name-input': 'modern-slot-name-input',
+      'bet-size-input': 'modern-bet-size-input',
+      'slot-img-url-input': 'modern-slot-img-url-input'
+    };
+    
+    const classicCheckboxes = {
+      'super-checkbox': 'modern-super-checkbox'
+    };
+    
+    // Sync input values
+    Object.keys(classicInputs).forEach(classicId => {
+      const classicInput = document.getElementById(classicId);
+      const modernInput = document.getElementById(classicInputs[classicId]);
+      
+      if (classicInput && modernInput) {
+        modernInput.value = classicInput.value;
+      }
+    });
+    
+    // Sync checkbox values
+    Object.keys(classicCheckboxes).forEach(classicId => {
+      const classicCheckbox = document.getElementById(classicId);
+      const modernCheckbox = document.getElementById(classicCheckboxes[classicId]);
+      
+      if (classicCheckbox && modernCheckbox) {
+        modernCheckbox.checked = classicCheckbox.checked;
+      }
+    });
   }
 
   toggleSuperStatus(bonusId) {
@@ -437,6 +847,11 @@ class BonusHuntManager {
   }
 
   showBonusOpeningPanel() {
+    if (this.currentLayout === 'modern-sidebar') {
+      this.showModernBonusOpeningPanel();
+      return;
+    }
+    
     const middlePanel = document.getElementById('middle-panel');
     const bonusOpeningPanel = document.getElementById('bonus-opening-panel');
     
@@ -447,6 +862,8 @@ class BonusHuntManager {
 
     // Reset to first bonus when opening panel
     this.currentBonusOpeningIndex = 0;
+    this.currentBonusIndex = 0;
+    this.isEnteringPayout = true;
 
     if (middlePanel) middlePanel.style.display = 'none';
     if (bonusOpeningPanel) {
@@ -454,9 +871,22 @@ class BonusHuntManager {
       this.makeBonusOpeningPanelDraggable(bonusOpeningPanel);
       this.renderBonusOpeningList();
     }
+
+    // Update active slot in modern sidebar if visible
+    this.updateActiveSlotInModernSidebar();
   }
 
   hideBonusOpeningPanel() {
+    // Clear active slot tracking
+    this.currentBonusIndex = null;
+    this.isEnteringPayout = false;
+    this.updateActiveSlotInModernSidebar();
+    
+    if (this.currentLayout === 'modern-sidebar') {
+      this.hideModernBonusOpeningPanel();
+      return;
+    }
+    
     const middlePanel = document.getElementById('middle-panel');
     const bonusOpeningPanel = document.getElementById('bonus-opening-panel');
     
@@ -544,11 +974,34 @@ class BonusHuntManager {
       });
     }
 
-    // Set up payout input listener
+    // Set up comprehensive payout input listeners
     const payoutInput = bonusOpeningList.querySelector('.payout-input');
     if (payoutInput) {
-      payoutInput.addEventListener('input', (e) => {
-        this.updateBonusPayout(bonus.id, parseFloat(e.target.value) || 0);
+      // Add multiple event types to catch all payout changes
+      const payoutEventTypes = ['input', 'change', 'keyup', 'paste', 'blur'];
+      
+      payoutEventTypes.forEach(eventType => {
+        payoutInput.addEventListener(eventType, (e) => {
+          const newPayout = parseFloat(e.target.value) || 0;
+          console.log(`Payout input ${eventType} event: ${newPayout}`);
+          
+          // Small delay for paste events to ensure value is set
+          setTimeout(() => {
+            this.updateBonusPayout(bonus.id, newPayout);
+          }, eventType === 'paste' ? 50 : 10);
+        });
+      });
+      
+      // Also listen for Enter key to move to next bonus
+      payoutInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          const newPayout = parseFloat(e.target.value) || 0;
+          this.updateBonusPayout(bonus.id, newPayout);
+          // Move to next bonus after a short delay
+          setTimeout(() => {
+            this.navigateToNextBonus();
+          }, 100);
+        }
       });
       
       // Auto-focus and select text for easier input
@@ -563,7 +1016,9 @@ class BonusHuntManager {
     if (this.bonuses.length <= 1) return;
     
     this.currentBonusOpeningIndex = (this.currentBonusOpeningIndex + 1) % this.bonuses.length;
+    this.currentBonusIndex = this.currentBonusOpeningIndex;
     this.renderBonusOpeningList();
+    this.updateActiveSlotInModernSidebar();
   }
 
   navigateToPreviousBonus() {
@@ -572,7 +1027,9 @@ class BonusHuntManager {
     this.currentBonusOpeningIndex = this.currentBonusOpeningIndex === 0 
       ? this.bonuses.length - 1 
       : this.currentBonusOpeningIndex - 1;
+    this.currentBonusIndex = this.currentBonusOpeningIndex;
     this.renderBonusOpeningList();
+    this.updateActiveSlotInModernSidebar();
   }
 
   makeBonusOpeningPanelDraggable(panel) {
@@ -639,10 +1096,26 @@ class BonusHuntManager {
   updateBonusPayout(bonusId, payout) {
     const bonus = this.bonuses.find(b => b.id === bonusId);
     if (bonus) {
+      const oldPayout = bonus.payout;
       bonus.payout = payout;
       bonus.multiplier = bonus.bet > 0 ? payout / bonus.bet : 0;
+      
+      console.log(`Payout updated for ${bonus.slot}: ${oldPayout} -> ${payout} (${bonus.multiplier.toFixed(2)}x)`);
+      
       this.updateTotals();
       this.renderBonusList();
+      this.saveBonuses(); // Save immediately when payout changes
+      
+      // Force comprehensive statistics refresh
+      this.refreshAllStatistics();
+      
+      // Trigger calculator update immediately
+      if (window.bonusHuntUI) {
+        setTimeout(() => {
+          console.log('Triggering calculator update after payout change');
+          window.bonusHuntUI.onBonusDataChanged();
+        }, 50);
+      }
     }
   }
 
@@ -678,6 +1151,21 @@ class BonusHuntManager {
     if (window.bonusHuntUI) {
       window.bonusHuntUI.onBonusDataChanged();
     }
+    
+    // Force immediate statistics refresh
+    this.refreshAllStatistics();
+    
+    // Update modern sidebar stats if active
+    this.updateModernSidebarStats();
+    
+    // Debug logging for totals update
+    console.log('Totals updated:', {
+      totalBet: this.totalBet,
+      totalPayout: this.totalPayout,
+      profit: this.totalPayout - this.totalBet,
+      bonusCount: this.bonuses.length,
+      openedBonuses: this.bonuses.filter(b => b.payout && b.payout > 0).length
+    });
   }
 
   updateStatsBar() {
@@ -847,6 +1335,502 @@ class BonusHuntManager {
 
 
 
+  refreshAllStatistics() {
+    // Force refresh of all statistics whenever any input changes
+    setTimeout(() => {
+      if (window.bonusHuntUI) {
+        console.log('Force refreshing all bonus hunt statistics...');
+        window.bonusHuntUI.updateCalculatorFromInputs();
+        window.bonusHuntUI.updateAllDisplays();
+      }
+    }, 50);
+  }
+
+  switchLayout(layout) {
+    console.log('🔄 Switching layout to:', layout);
+    this.currentLayout = layout;
+    localStorage.setItem('bonusLayoutMode', layout);
+    
+    // Get all layout elements
+    const classicCard = document.getElementById('bonus-list-classic');
+    const modernCard = document.getElementById('bonus-list-modern');
+    const modernSidebar = document.getElementById('modern-bonus-sidebar');
+    const classicBHPanel = document.getElementById('middle-panel');
+    const modernBHPanel = document.getElementById('modern-bh-panel');
+    const classicBonusOpening = document.getElementById('bonus-opening-panel');
+    const modernBonusOpening = document.getElementById('modern-bonus-opening-panel');
+    const layoutSelect = document.getElementById('bonus-list-layout-select');
+    
+    console.log('📋 Classic elements found:', !!classicCard, !!classicBHPanel, !!classicBonusOpening);
+    console.log('🎠 Modern card found:', !!modernCard);
+    console.log('🎆 Modern sidebar elements found:', !!modernSidebar, !!modernBHPanel, !!modernBonusOpening);
+    
+    // Hide ALL layouts and panels first
+    if (classicCard) {
+      classicCard.style.display = 'none';
+      console.log('🚫 Hid classic card');
+    }
+    if (modernCard) {
+      modernCard.style.display = 'none';
+      console.log('🚫 Hid modern card');
+    }
+    if (modernSidebar) {
+      modernSidebar.style.display = 'none';
+      console.log('🚫 Hid modern sidebar');
+    }
+    if (classicBHPanel) classicBHPanel.style.display = 'none';
+    if (modernBHPanel) modernBHPanel.style.display = 'none';
+    if (classicBonusOpening) classicBonusOpening.style.display = 'none';
+    if (modernBonusOpening) modernBonusOpening.style.display = 'none';
+    
+    // Also hide the info panel which contains the classic bonus list
+    const infoPanel = document.querySelector('.info-panel');
+    const bonusStatsPanel = document.getElementById('bonus-stats-panel');
+    if (infoPanel) {
+      infoPanel.classList.remove('info-panel--visible');
+      console.log('🚫 Hid info panel');
+    }
+    if (bonusStatsPanel) {
+      bonusStatsPanel.style.display = 'none';
+      console.log('🚫 Hid bonus stats panel');
+    }
+    
+    // Show the selected layout
+    if (layout === 'modern-card') {
+      if (modernCard) {
+        modernCard.style.display = 'block';
+        console.log('✅ Showed modern card');
+      }
+      // Modern card uses classic panels (hidden until BH button clicked)
+    } else if (layout === 'modern-sidebar') {
+      // Modern sidebar starts hidden - only shows when BH button is clicked
+      if (modernSidebar) {
+        modernSidebar.style.display = 'none';
+        console.log('🚫 Modern sidebar ready but hidden until BH button clicked');
+      }
+      if (modernBHPanel) {
+        modernBHPanel.style.display = 'none';
+        console.log('🚫 Modern BH panel ready but hidden until BH button clicked');
+      }
+      // Keep info panel hidden for modern sidebar
+      const infoPanel = document.querySelector('.info-panel');
+      if (infoPanel) {
+        infoPanel.classList.remove('info-panel--visible');
+        console.log('🚫 Keeping info panel hidden for modern sidebar');
+      }
+    } else {
+      // Classic layout
+      if (classicCard) {
+        classicCard.style.display = 'block';
+        console.log('✅ Showed classic card');
+      }
+      // Classic layout uses classic panels (hidden until BH button clicked)
+    }
+    
+    // Update select dropdown if exists
+    if (layoutSelect) {
+      layoutSelect.value = layout;
+      console.log('✅ Updated dropdown to:', layout);
+    }
+    
+    // Sync input values between classic and modern panels
+    this.syncPanelInputs();
+    
+    // Re-render to ensure all layouts are updated
+    this.renderBonusList();
+    this.updateModernSidebarStats();
+    
+    const layoutName = layout === 'modern-sidebar' ? 'Modern Sidebar' : 
+                      layout === 'modern-card' ? 'Modern Card' : 'Classic';
+    this.showFeedback(`Switched to ${layoutName} layout`, 'info');
+    
+    // Reset BH button state when layout changes
+    const bhBtn = document.getElementById('bh-btn');
+    if (bhBtn) {
+      bhBtn.classList.remove('active');
+      console.log('🔄 Reset BH button state for layout change');
+    }
+    
+    // Update info panel visibility based on new layout
+    if (window.bonusHuntUI && window.bonusHuntUI.updateInfoPanelVisibility) {
+      setTimeout(() => {
+        window.bonusHuntUI.updateInfoPanelVisibility();
+      }, 100);
+    }
+    
+    console.log('🏁 Layout switch complete');
+  }
+
+  hideAllPanelsOnInit() {
+    // Ensure all panels are hidden when page loads
+    const classicBHPanel = document.getElementById('middle-panel');
+    const modernBHPanel = document.getElementById('modern-bh-panel');
+    const modernSidebar = document.getElementById('modern-bonus-sidebar');
+    const classicBonusOpening = document.getElementById('bonus-opening-panel');
+    const modernBonusOpening = document.getElementById('modern-bonus-opening-panel');
+    const infoPanel = document.querySelector('.info-panel');
+    const bonusStatsPanel = document.getElementById('bonus-stats-panel');
+    
+    if (classicBHPanel) classicBHPanel.style.display = 'none';
+    if (modernBHPanel) modernBHPanel.style.display = 'none';
+    if (modernSidebar) modernSidebar.style.display = 'none';
+    if (classicBonusOpening) classicBonusOpening.style.display = 'none';
+    if (modernBonusOpening) modernBonusOpening.style.display = 'none';
+    if (infoPanel) infoPanel.classList.remove('info-panel--visible');
+    if (bonusStatsPanel) bonusStatsPanel.style.display = 'none';
+    
+    // Reset BH button state
+    const bhBtn = document.getElementById('bh-btn');
+    if (bhBtn) bhBtn.classList.remove('active');
+    
+    console.log('🚫 All panels hidden on initialization');
+  }
+
+  toggleBHPanel() {
+    const classicBHPanel = document.getElementById('middle-panel');
+    const modernBHPanel = document.getElementById('modern-bh-panel');
+    const modernSidebar = document.getElementById('modern-bonus-sidebar');
+    const classicBonusOpening = document.getElementById('bonus-opening-panel');
+    const modernBonusOpening = document.getElementById('modern-bonus-opening-panel');
+    
+    // Hide bonus opening panels if they're open
+    if (classicBonusOpening) classicBonusOpening.style.display = 'none';
+    if (modernBonusOpening) modernBonusOpening.style.display = 'none';
+    
+    // Show appropriate BH panel based on current layout
+    if (this.currentLayout === 'modern-sidebar') {
+      // Modern sidebar: toggle entire modern style (sidebar + BH panel together)
+      if (classicBHPanel) classicBHPanel.style.display = 'none';
+      
+      const isSidebarVisible = modernSidebar && modernSidebar.style.display === 'flex';
+      
+      if (isSidebarVisible) {
+        // Hide both sidebar and BH panel (turn off modern style)
+        if (modernSidebar) modernSidebar.style.display = 'none';
+        if (modernBHPanel) modernBHPanel.style.display = 'none';
+        console.log('✅ Hid modern style (sidebar + BH panel)');
+      } else {
+        // Show both sidebar and BH panel (turn on modern style)
+        if (modernSidebar) modernSidebar.style.display = 'flex';
+        if (modernBHPanel) {
+          modernBHPanel.style.display = 'flex';
+          this.syncPanelInputs();
+        }
+        console.log('✅ Showed modern style (sidebar + BH panel)');
+      }
+    } else {
+      // Classic and modern card layouts use classic BH panel only
+      if (modernBHPanel) modernBHPanel.style.display = 'none';
+      if (modernSidebar) modernSidebar.style.display = 'none';
+      
+      if (classicBHPanel) {
+        if (classicBHPanel.style.display === 'none' || classicBHPanel.style.display === '') {
+          classicBHPanel.style.display = 'flex';
+          console.log('✅ Showed classic BH panel');
+        } else {
+          classicBHPanel.style.display = 'none';
+          console.log('✅ Hid classic BH panel');
+        }
+      }
+    }
+  }
+
+  setupModernPanelEventListeners() {
+    // Modern add slot button
+    const modernAddSlotBtn = document.getElementById('modern-add-slot-btn');
+    if (modernAddSlotBtn) {
+      modernAddSlotBtn.addEventListener('click', () => this.addBonusFromModernPanel());
+    }
+
+    // Modern slot name input
+    const modernSlotNameInput = document.getElementById('modern-slot-name-input');
+    if (modernSlotNameInput) {
+      modernSlotNameInput.addEventListener('input', () => this.handleModernSlotNameInput());
+      modernSlotNameInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          this.addBonusFromModernPanel();
+        }
+      });
+    }
+
+    // Hide modern suggestions when clicking outside
+    document.addEventListener('click', (e) => {
+      const modernSuggestionBox = document.querySelector('.modern-grid-container .slot-suggestion-box');
+      const modernSlotInput = document.getElementById('modern-slot-name-input');
+      if (modernSuggestionBox && modernSlotInput && 
+          !modernSlotInput.contains(e.target) && 
+          !modernSuggestionBox.contains(e.target)) {
+        modernSuggestionBox.style.display = 'none';
+      }
+    });
+
+    // Modern bet size input
+    const modernBetSizeInput = document.getElementById('modern-bet-size-input');
+    if (modernBetSizeInput) {
+      modernBetSizeInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          this.addBonusFromModernPanel();
+        }
+      });
+    }
+
+    // Modern balance inputs for stats updates
+    const modernBalanceInputs = [
+      'modern-start-money-input', 
+      'modern-stop-money-input', 
+      'modern-actual-balance-input', 
+      'modern-total-spent-input'
+    ];
+    
+    modernBalanceInputs.forEach(inputId => {
+      const input = document.getElementById(inputId);
+      if (input) {
+        ['input', 'change', 'keyup', 'paste', 'cut', 'blur'].forEach(eventType => {
+          input.addEventListener(eventType, () => {
+            setTimeout(() => {
+              this.updateStatsBar();
+              this.updateModernSidebarStats();
+              if (window.bonusHuntUI) {
+                window.bonusHuntUI.onBonusDataChanged();
+              }
+            }, 10);
+          });
+        });
+      }
+    });
+
+    // Modern bonus opening button
+    const modernBonusOpeningBtn = document.getElementById('modern-bonus-opening-btn');
+    if (modernBonusOpeningBtn) {
+      modernBonusOpeningBtn.addEventListener('click', () => this.showModernBonusOpeningPanel());
+    }
+
+    // Close modern bonus opening button
+    const closeModernBonusOpeningBtn = document.getElementById('close-modern-bonus-opening-btn');
+    if (closeModernBonusOpeningBtn) {
+      closeModernBonusOpeningBtn.addEventListener('click', () => this.hideModernBonusOpeningPanel());
+    }
+
+    // Close modern BH panel button (closes entire modern style)
+    const closeModernBHPanelBtn = document.getElementById('close-modern-bh-panel');
+    if (closeModernBHPanelBtn) {
+      closeModernBHPanelBtn.addEventListener('click', () => {
+        if (this.currentLayout === 'modern-sidebar') {
+          // Hide entire modern style (sidebar + BH panel)
+          const modernSidebar = document.getElementById('modern-bonus-sidebar');
+          const modernBHPanel = document.getElementById('modern-bh-panel');
+          if (modernSidebar) modernSidebar.style.display = 'none';
+          if (modernBHPanel) modernBHPanel.style.display = 'none';
+          
+          // Update BH button state
+          const bhBtn = document.getElementById('bh-btn');
+          if (bhBtn) bhBtn.classList.remove('active');
+          
+          console.log('✅ Closed modern style via close button');
+        }
+      });
+    }
+  }
+
+  addBonusFromModernPanel() {
+    const slotNameInput = document.getElementById('modern-slot-name-input');
+    const betSizeInput = document.getElementById('modern-bet-size-input');
+    const superCheckbox = document.getElementById('modern-super-checkbox');
+    
+    if (!slotNameInput || !betSizeInput) return;
+
+    const slotName = slotNameInput.value.trim();
+    const betSize = parseFloat(betSizeInput.value);
+
+    if (!slotName || !betSize || betSize <= 0) {
+      this.showFeedback('Please enter valid slot name and bet size', 'error');
+      return;
+    }
+
+    const bonus = {
+      id: Date.now(),
+      slot: slotName,
+      bet: betSize,
+      payout: null,
+      multiplier: 0,
+      isSuper: superCheckbox ? superCheckbox.checked : false,
+      timestamp: new Date().toISOString()
+    };
+
+    this.bonuses.push(bonus);
+    this.updateTotals();
+    this.renderBonusList();
+    this.saveBonuses();
+
+    // Clear inputs
+    slotNameInput.value = '';
+    betSizeInput.value = '';
+    if (superCheckbox) superCheckbox.checked = false;
+    this.hideSelectedSlot();
+
+    slotNameInput.focus();
+    this.showFeedback(`Added ${slotName} - €${betSize.toFixed(2)}`, 'success');
+  }
+
+  syncPanelInputs() {
+    // Sync values from classic to modern panels
+    const classicInputs = {
+      'start-money-input': 'modern-start-money-input',
+      'stop-money-input': 'modern-stop-money-input',
+      'actual-balance-input': 'modern-actual-balance-input',
+      'total-spent-input': 'modern-total-spent-input',
+      'slot-name-input': 'modern-slot-name-input',
+      'bet-size-input': 'modern-bet-size-input',
+      'slot-img-url-input': 'modern-slot-img-url-input'
+    };
+    
+    const classicCheckboxes = {
+      'super-checkbox': 'modern-super-checkbox'
+    };
+    
+    // Sync input values
+    Object.keys(classicInputs).forEach(classicId => {
+      const classicInput = document.getElementById(classicId);
+      const modernInput = document.getElementById(classicInputs[classicId]);
+      
+      if (classicInput && modernInput) {
+        modernInput.value = classicInput.value;
+      }
+    });
+    
+    // Sync checkbox values
+    Object.keys(classicCheckboxes).forEach(classicId => {
+      const classicCheckbox = document.getElementById(classicId);
+      const modernCheckbox = document.getElementById(classicCheckboxes[classicId]);
+      
+      if (classicCheckbox && modernCheckbox) {
+        modernCheckbox.checked = classicCheckbox.checked;
+      }
+    });
+  }
+
+  showModernBonusOpeningPanel() {
+    const modernBHPanel = document.getElementById('modern-bh-panel');
+    const modernBonusOpeningPanel = document.getElementById('modern-bonus-opening-panel');
+    
+    if (this.bonuses.length === 0) {
+      this.showFeedback('No bonuses to open! Add bonuses first.', 'error');
+      return;
+    }
+
+    // Reset to first bonus when opening panel
+    this.currentBonusOpeningIndex = 0;
+    this.currentBonusIndex = 0;
+    this.isEnteringPayout = true;
+
+    if (modernBHPanel) modernBHPanel.style.display = 'none';
+    if (modernBonusOpeningPanel) {
+      modernBonusOpeningPanel.style.display = 'flex';
+      this.renderModernBonusOpeningList();
+    }
+
+    // Update active slot in modern sidebar
+    this.updateActiveSlotInModernSidebar();
+  }
+
+  hideModernBonusOpeningPanel() {
+    // Clear active slot tracking
+    this.currentBonusIndex = null;
+    this.isEnteringPayout = false;
+    this.updateActiveSlotInModernSidebar();
+    
+    const modernBHPanel = document.getElementById('modern-bh-panel');
+    const modernBonusOpeningPanel = document.getElementById('modern-bonus-opening-panel');
+    
+    if (modernBHPanel) modernBHPanel.style.display = 'flex';
+    if (modernBonusOpeningPanel) modernBonusOpeningPanel.style.display = 'none';
+  }
+
+  renderModernBonusOpeningList() {
+    const modernBonusOpeningList = document.getElementById('modern-bonus-opening-list');
+    if (!modernBonusOpeningList) return;
+
+    // Use the same logic as classic bonus opening but with modern styling
+    if (this.currentBonusOpeningIndex >= this.bonuses.length) {
+      this.currentBonusOpeningIndex = 0;
+    }
+
+    if (this.bonuses.length === 0) return;
+
+    const bonus = this.bonuses[this.currentBonusOpeningIndex];
+    const slotImage = this.getSlotImage(bonus.slot);
+    
+    modernBonusOpeningList.innerHTML = `
+      <div class="modern-bonus-opening-item">
+        <div class="modern-slot-display">
+          <img src="${slotImage}" alt="${bonus.slot}" class="modern-bonus-slot-image">
+          <div class="modern-slot-info">
+            <div class="modern-slot-name">${bonus.slot}</div>
+            <div class="modern-slot-bet">Bet: €${bonus.bet.toFixed(2)}</div>
+          </div>
+        </div>
+        <div class="modern-payout-section">
+          <input type="number" 
+                 class="modern-payout-input" 
+                 placeholder="Enter payout" 
+                 value="${bonus.payout !== null ? bonus.payout : ''}"
+                 min="0" 
+                 step="0.01"
+                 data-bonus-id="${bonus.id}">
+          <span class="currency">€</span>
+        </div>
+        <div class="modern-navigation">
+          <button class="modern-nav-btn" id="modern-prev-bonus-btn" ${this.bonuses.length <= 1 ? 'style="visibility: hidden;"' : ''}>
+            ← Previous
+          </button>
+          <div class="modern-counter">${this.currentBonusOpeningIndex + 1} / ${this.bonuses.length}</div>
+          <button class="modern-nav-btn" id="modern-next-bonus-btn" ${this.bonuses.length <= 1 ? 'style="visibility: hidden;"' : ''}>
+            Next →
+          </button>
+        </div>
+      </div>
+    `;
+
+    // Set up event listeners for modern bonus opening
+    const prevBtn = document.getElementById('modern-prev-bonus-btn');
+    const nextBtn = document.getElementById('modern-next-bonus-btn');
+    const payoutInput = modernBonusOpeningList.querySelector('.modern-payout-input');
+    
+    if (prevBtn) {
+      prevBtn.addEventListener('click', () => this.navigateToPreviousBonus());
+    }
+    
+    if (nextBtn) {
+      nextBtn.addEventListener('click', () => this.navigateToNextBonus());
+    }
+    
+    if (payoutInput) {
+      ['input', 'change', 'keyup', 'paste', 'blur'].forEach(eventType => {
+        payoutInput.addEventListener(eventType, (e) => {
+          const newPayout = parseFloat(e.target.value) || 0;
+          setTimeout(() => {
+            this.updateBonusPayout(bonus.id, newPayout);
+          }, eventType === 'paste' ? 50 : 10);
+        });
+      });
+      
+      payoutInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          const newPayout = parseFloat(e.target.value) || 0;
+          this.updateBonusPayout(bonus.id, newPayout);
+          setTimeout(() => {
+            this.navigateToNextBonus();
+          }, 100);
+        }
+      });
+      
+      setTimeout(() => {
+        payoutInput.focus();
+        payoutInput.select();
+      }, 100);
+    }
+  }
+
   showFeedback(message, type = 'info') {
     // Create or update feedback display
     let feedback = document.getElementById('bonus-hunt-feedback');
@@ -869,3 +1853,12 @@ class BonusHuntManager {
 
 // Export for use in main script
 window.BonusHuntManager = BonusHuntManager;
+
+// Global method for layout switching (accessible from customization panel)
+window.switchBonusLayout = function(layout) {
+  if (window.bonusHuntManager && window.bonusHuntManager.switchLayout) {
+    window.bonusHuntManager.switchLayout(layout);
+  } else {
+    console.warn('⚠️ Bonus Hunt Manager not available for layout switching');
+  }
+};

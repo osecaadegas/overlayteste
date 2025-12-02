@@ -5,6 +5,7 @@ class RandomSlotManager {
     this.currentSlot = null;
     this.history = [];
     this.favorites = [];
+    this.selectedProviders = new Set();
     this.init();
   }
 
@@ -12,69 +13,130 @@ class RandomSlotManager {
     console.log('Random Slot Manager initialized');
     this.setupEventListeners();
     this.loadFavorites();
+    this.loadHistory();
   }
 
   setupEventListeners() {
-    // Generate random slot button
-    const generateBtn = document.getElementById('generate-random-slot');
-    if (generateBtn) {
-      generateBtn.addEventListener('click', () => this.generateRandomSlot());
+    console.log('Setting up RandomSlot event listeners...');
+    
+    // Wait for DOM to be ready
+    setTimeout(() => {
+      this.attachEventListeners();
+    }, 100);
+  }
+
+  attachEventListeners() {
+    // Shuffle button - the main button to generate random slot
+    const shuffleBtn = document.querySelector('.shuffle-btn, #shuffle-slot-btn, [onclick*="shuffle"], .slot-shuffle-btn');
+    console.log('Shuffle button found:', !!shuffleBtn);
+    
+    if (shuffleBtn) {
+      // Remove any existing onclick handlers
+      shuffleBtn.removeAttribute('onclick');
+      shuffleBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        console.log('Shuffle button clicked!');
+        this.generateRandomSlot();
+      });
     }
 
-    // Generate by provider buttons
-    document.querySelectorAll('.provider-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        const provider = e.target.dataset.provider;
-        if (provider) {
-          this.generateSlotByProvider(provider);
+    // Use This Slot button
+    const useSlotBtn = document.querySelector('.use-slot-btn, #use-this-slot-btn, [onclick*="use"]');
+    console.log('Use slot button found:', !!useSlotBtn);
+    
+    if (useSlotBtn) {
+      useSlotBtn.removeAttribute('onclick');
+      useSlotBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        console.log('Use slot button clicked!');
+        this.useCurrentSlot();
+      });
+    }
+
+    // Provider checkboxes
+    const providerCheckboxes = document.querySelectorAll('input[type="checkbox"]');
+    console.log('Provider checkboxes found:', providerCheckboxes.length);
+    
+    providerCheckboxes.forEach(checkbox => {
+      checkbox.addEventListener('change', (e) => {
+        const providerName = this.getProviderNameFromCheckbox(e.target);
+        console.log('Provider checkbox changed:', providerName, e.target.checked);
+        
+        if (e.target.checked) {
+          this.selectedProviders.add(providerName);
+        } else {
+          this.selectedProviders.delete(providerName);
         }
+        
+        console.log('Selected providers:', Array.from(this.selectedProviders));
       });
     });
 
-    // Add to favorites
-    const favoriteBtn = document.getElementById('add-to-favorites');
-    if (favoriteBtn) {
-      favoriteBtn.addEventListener('click', () => this.addToFavorites());
-    }
+    // Auto-generate a slot on first load if none is showing
+    setTimeout(() => {
+      if (!this.currentSlot) {
+        console.log('Auto-generating initial slot...');
+        this.generateRandomSlot();
+      }
+    }, 500);
+  }
 
-    // Show history
-    const historyBtn = document.getElementById('show-history');
-    if (historyBtn) {
-      historyBtn.addEventListener('click', () => this.showHistory());
-    }
-
-    // Clear history
-    const clearHistoryBtn = document.getElementById('clear-history');
-    if (clearHistoryBtn) {
-      clearHistoryBtn.addEventListener('click', () => this.clearHistory());
-    }
-
-    // Provider filter
-    const providerFilter = document.getElementById('provider-filter');
-    if (providerFilter) {
-      providerFilter.addEventListener('change', (e) => {
-        this.filterByProvider(e.target.value);
-      });
-    }
-
-    // Volatility filter
-    const volatilityFilter = document.getElementById('volatility-filter');
-    if (volatilityFilter) {
-      volatilityFilter.addEventListener('change', (e) => {
-        this.filterByVolatility(e.target.value);
-      });
-    }
+  getProviderNameFromCheckbox(checkbox) {
+    // Try to get provider name from various sources
+    const label = checkbox.parentElement;
+    const labelText = label ? label.textContent.trim() : '';
+    
+    // Map of display names to actual provider names
+    const providerMap = {
+      'Pragmatic Play': 'Pragmatic Play',
+      'No Limit': 'No Limit City',
+      '3Oaks': '3 Oaks',
+      'Play\'n GO': 'Play\'n GO',
+      'Big Time Gaming': 'Big Time Gaming',
+      'Hacksaw': 'Hacksaw Gaming',
+      'Bgaming': 'BGaming',
+      'Belatra': 'Belatra',
+      'Play\'n GO': 'Play\'n GO'
+    };
+    
+    return providerMap[labelText] || labelText;
   }
 
   generateRandomSlot() {
-    if (!slotDatabase || slotDatabase.length === 0) {
+    console.log('Generating random slot...');
+    console.log('Slot database available:', typeof window.slotDatabase, window.slotDatabase?.length);
+    console.log('Selected providers:', Array.from(this.selectedProviders));
+    
+    if (!window.slotDatabase || window.slotDatabase.length === 0) {
       this.showFeedback('Slot database not available', 'error');
+      console.error('Slot database not available');
+      return;
+    }
+
+    let availableSlots = [...window.slotDatabase];
+
+    // Filter by selected providers if any are selected
+    if (this.selectedProviders.size > 0) {
+      availableSlots = availableSlots.filter(slot => {
+        return Array.from(this.selectedProviders).some(provider => 
+          slot.provider && slot.provider.toLowerCase().includes(provider.toLowerCase()) ||
+          provider.toLowerCase().includes(slot.provider.toLowerCase())
+        );
+      });
+      
+      console.log('Filtered slots by provider:', availableSlots.length);
+    }
+
+    if (availableSlots.length === 0) {
+      this.showFeedback('No slots found with selected filters', 'error');
       return;
     }
 
     // Get random slot
-    const randomIndex = Math.floor(Math.random() * slotDatabase.length);
-    const slot = slotDatabase[randomIndex];
+    const randomIndex = Math.floor(Math.random() * availableSlots.length);
+    const slot = availableSlots[randomIndex];
+    
+    console.log('Generated slot:', slot);
     
     this.currentSlot = slot;
     this.addToHistory(slot);
@@ -82,96 +144,240 @@ class RandomSlotManager {
     this.showFeedback(`Generated: ${slot.name}`, 'success');
   }
 
+  useCurrentSlot() {
+    if (!this.currentSlot) {
+      this.showFeedback('No slot selected to use', 'error');
+      return;
+    }
+    
+    console.log('Using current slot:', this.currentSlot);
+    
+    // Add to bonus hunt if BonusHuntManager is available
+    if (window.bonusHuntManager && typeof window.bonusHuntManager.addBonus === 'function') {
+      // Fill the slot name input in the bonus hunt
+      const slotNameInput = document.getElementById('slot-name-input');
+      if (slotNameInput) {
+        slotNameInput.value = this.currentSlot.name;
+        slotNameInput.dispatchEvent(new Event('input', { bubbles: true }));
+        console.log('Set slot name in bonus hunt input');
+      }
+      
+      // Focus on bet size input for convenience
+      const betSizeInput = document.getElementById('bet-size-input');
+      if (betSizeInput) {
+        setTimeout(() => betSizeInput.focus(), 100);
+      }
+      
+      this.showFeedback(`Added "${this.currentSlot.name}" to bonus hunt!`, 'success');
+      
+      // Close the random slot panel
+      this.closeRandomSlotPanel();
+    } else {
+      this.showFeedback('Bonus hunt not available', 'error');
+    }
+  }
+  
+  closeRandomSlotPanel() {
+    const randomSlotPanel = document.getElementById('random-slot-panel');
+    if (randomSlotPanel) {
+      randomSlotPanel.style.display = 'none';
+    }
+    
+    // Show main panel
+    const middlePanel = document.getElementById('middle-panel');
+    if (middlePanel) {
+      middlePanel.style.display = 'flex';
+    }
+  }
+
   generateSlotByProvider(providerName) {
-    if (!window.slotDatabase || window.slotDatabase.length === 0) {
-      this.showFeedback('Slot database not available', 'error');
-      return;
-    }
-
-    const providerSlots = window.slotDatabase.filter(slot => 
-      slot.provider.toLowerCase() === providerName.toLowerCase()
-    );
-
-    if (providerSlots.length === 0) {
-      this.showFeedback(`No slots found for ${providerName}`, 'error');
-      return;
-    }
-
-    const randomIndex = Math.floor(Math.random() * providerSlots.length);
-    const slot = providerSlots[randomIndex];
-    
-    this.currentSlot = slot;
-    this.addToHistory(slot);
-    this.displaySlot(slot);
-    this.showFeedback(`Generated ${providerName}: ${slot.name}`, 'success');
-  }
-
-  filterByProvider(provider) {
-    if (!provider || provider === 'all') {
-      this.generateRandomSlot();
-      return;
-    }
-
-    this.generateSlotByProvider(provider);
-  }
-
-  filterByVolatility(volatility) {
-    if (!window.slotDatabase || window.slotDatabase.length === 0) {
-      this.showFeedback('Slot database not available', 'error');
-      return;
-    }
-
-    if (!volatility || volatility === 'all') {
-      this.generateRandomSlot();
-      return;
-    }
-
-    const volatilitySlots = window.slotDatabase.filter(slot => 
-      slot.volatility && slot.volatility.toLowerCase() === volatility.toLowerCase()
-    );
-
-    if (volatilitySlots.length === 0) {
-      this.showFeedback(`No ${volatility} volatility slots found`, 'error');
-      return;
-    }
-
-    const randomIndex = Math.floor(Math.random() * volatilitySlots.length);
-    const slot = volatilitySlots[randomIndex];
-    
-    this.currentSlot = slot;
-    this.addToHistory(slot);
-    this.displaySlot(slot);
-    this.showFeedback(`Generated ${volatility}: ${slot.name}`, 'success');
+    // This method is now handled in generateRandomSlot() with provider filtering
+    console.log('Provider-specific generation handled by main method');
   }
 
   displaySlot(slot) {
-    // Update main display
-    const slotImage = document.getElementById('random-slot-image');
-    const slotName = document.getElementById('random-slot-name');
-    const slotProvider = document.getElementById('random-slot-provider');
-    const slotRTP = document.getElementById('random-slot-rtp');
-    const slotVolatility = document.getElementById('random-slot-volatility');
-    const slotMaxWin = document.getElementById('random-slot-maxwin');
-
-    if (slotImage) {
-      slotImage.src = slot.image || 'https://i.imgur.com/8E3ucNx.png';
-      slotImage.alt = slot.name;
+    console.log('Displaying slot:', slot);
+    
+    // Clear any existing displays first to prevent stacking
+    this.clearExistingDisplays();
+    
+    // Find or create the main slot display container
+    let slotDisplay = document.querySelector('#random-slot-display, .random-slot-result, .slot-display-container');
+    
+    if (!slotDisplay) {
+      // Create a new display container
+      slotDisplay = this.createSlotDisplayContainer();
     }
-
-    if (slotName) slotName.textContent = slot.name;
-    if (slotProvider) slotProvider.textContent = slot.provider;
-    if (slotRTP) slotRTP.textContent = slot.rtp ? `${slot.rtp}%` : 'N/A';
-    if (slotVolatility) slotVolatility.textContent = slot.volatility || 'N/A';
-    if (slotMaxWin) slotMaxWin.textContent = slot.maxWin ? `${slot.maxWin}x` : 'N/A';
-
-    // Show the display
-    const randomSlotDisplay = document.getElementById('random-slot-display');
-    if (randomSlotDisplay) {
-      randomSlotDisplay.style.display = 'block';
+    
+    // Update the display with clean, modern slot card
+    slotDisplay.innerHTML = `
+      <div class="modern-slot-card">
+        <div class="slot-image-container">
+          <img src="${slot.image || 'https://i.imgur.com/8E3ucNx.png'}" 
+               alt="${slot.name}" 
+               class="slot-image"
+               onerror="this.src='https://i.imgur.com/8E3ucNx.png';">
+        </div>
+        <div class="slot-info">
+          <div class="slot-name">${slot.name}</div>
+          <div class="slot-provider">${slot.provider}</div>
+          <div class="slot-stats">
+            ${slot.rtp ? `<span class="stat-item">RTP: ${slot.rtp}%</span>` : ''}
+            ${slot.volatility ? `<span class="stat-item">Vol: ${slot.volatility}</span>` : ''}
+            ${slot.maxWin ? `<span class="stat-item">Max: ${slot.maxWin}x</span>` : ''}
+          </div>
+        </div>
+      </div>
+    `;
+    
+    // Add the CSS styles for the modern slot card
+    this.addSlotCardStyles();
+    
+    slotDisplay.style.display = 'block';
+    console.log('Updated slot display with clean modern card');
+  }
+  
+  clearExistingDisplays() {
+    // Remove any duplicate or old displays
+    const existingDisplays = document.querySelectorAll(
+      '.slot-card, .random-slot-result, .slot-display-card, .current-slot-display, .slot-result-display'
+    );
+    
+    existingDisplays.forEach(display => {
+      if (display.parentElement && display !== this.mainDisplayContainer) {
+        display.remove();
+      }
+    });
+  }
+  
+  createSlotDisplayContainer() {
+    // Find the random slot panel
+    const randomSlotPanel = document.querySelector('#random-slot-panel, .random-slot-panel');
+    
+    if (randomSlotPanel) {
+      // Create a dedicated display container
+      const container = document.createElement('div');
+      container.id = 'random-slot-display';
+      container.className = 'slot-display-container';
+      
+      // Find the best place to insert it (between filters and buttons)
+      const buttonsContainer = randomSlotPanel.querySelector('.random-slot-actions, .slot-actions, .action-buttons');
+      
+      if (buttonsContainer) {
+        randomSlotPanel.insertBefore(container, buttonsContainer);
+      } else {
+        randomSlotPanel.appendChild(container);
+      }
+      
+      this.mainDisplayContainer = container;
+      return container;
     }
-
-    // Update additional info if available
-    this.updateSlotDetails(slot);
+    
+    // Fallback: create floating container
+    const container = document.createElement('div');
+    container.id = 'random-slot-display';
+    container.className = 'slot-display-container floating';
+    document.body.appendChild(container);
+    
+    this.mainDisplayContainer = container;
+    return container;
+  }
+  
+  addSlotCardStyles() {
+    // Check if styles are already added
+    if (document.getElementById('random-slot-styles')) return;
+    
+    const styles = document.createElement('style');
+    styles.id = 'random-slot-styles';
+    styles.textContent = `
+      .slot-display-container {
+        margin: 20px 0;
+        display: flex;
+        justify-content: center;
+        min-height: 120px;
+      }
+      
+      .slot-display-container.floating {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 1000;
+        background: rgba(0,0,0,0.9);
+        padding: 20px;
+        border-radius: 15px;
+        border: 2px solid #00e1ff;
+      }
+      
+      .modern-slot-card {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        padding: 15px;
+        background: linear-gradient(135deg, rgba(0, 225, 255, 0.1), rgba(147, 70, 255, 0.1));
+        border: 2px solid #00e1ff;
+        border-radius: 12px;
+        min-width: 300px;
+        transition: all 0.3s ease;
+      }
+      
+      .modern-slot-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(0, 225, 255, 0.3);
+      }
+      
+      .slot-image-container {
+        flex-shrink: 0;
+      }
+      
+      .slot-image {
+        width: 70px;
+        height: 70px;
+        border-radius: 10px;
+        object-fit: cover;
+        border: 2px solid #ffd700;
+        box-shadow: 0 4px 15px rgba(255, 215, 0, 0.3);
+      }
+      
+      .slot-info {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+      }
+      
+      .slot-name {
+        font-size: 16px;
+        font-weight: 700;
+        color: #ffffff;
+        line-height: 1.2;
+        margin-bottom: 2px;
+      }
+      
+      .slot-provider {
+        font-size: 13px;
+        color: #00e1ff;
+        font-weight: 600;
+        margin-bottom: 5px;
+      }
+      
+      .slot-stats {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      
+      .stat-item {
+        font-size: 11px;
+        color: #9ca3af;
+        background: rgba(255,255,255,0.1);
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-weight: 500;
+      }
+    `;
+    
+    document.head.appendChild(styles);
   }
 
   updateSlotDetails(slot) {
@@ -306,21 +512,51 @@ class RandomSlotManager {
   }
 
   showFeedback(message, type = 'info') {
+    console.log('Feedback:', message, type);
+    
     // Create or update feedback display
     let feedback = document.getElementById('random-slot-feedback');
     if (!feedback) {
       feedback = document.createElement('div');
       feedback.id = 'random-slot-feedback';
       feedback.className = 'feedback-message';
+      feedback.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 12px 20px;
+        border-radius: 8px;
+        color: white;
+        font-weight: 600;
+        z-index: 10000;
+        font-size: 14px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        transition: all 0.3s ease;
+      `;
       document.body.appendChild(feedback);
     }
 
     feedback.textContent = message;
-    feedback.className = `feedback-message ${type}`;
+    
+    // Set color based on type
+    const colors = {
+      success: '#10b981',
+      error: '#ef4444',
+      info: '#3b82f6',
+      warning: '#f59e0b'
+    };
+    
+    feedback.style.backgroundColor = colors[type] || colors.info;
     feedback.style.display = 'block';
+    feedback.style.opacity = '1';
+    feedback.style.transform = 'translateY(0)';
 
     setTimeout(() => {
-      feedback.style.display = 'none';
+      feedback.style.opacity = '0';
+      feedback.style.transform = 'translateY(-10px)';
+      setTimeout(() => {
+        feedback.style.display = 'none';
+      }, 300);
     }, 3000);
   }
 
@@ -363,3 +599,25 @@ class RandomSlotManager {
 
 // Export for use in main script
 window.RandomSlotManager = RandomSlotManager;
+
+// Add debugging function
+window.testRandomSlot = function() {
+  console.log('Testing random slot picker...');
+  console.log('randomSlotManager available:', !!window.randomSlotManager);
+  console.log('slotDatabase available:', !!window.slotDatabase, window.slotDatabase?.length);
+  
+  if (window.randomSlotManager) {
+    window.randomSlotManager.generateRandomSlot();
+  } else {
+    console.error('randomSlotManager not available');
+  }
+};
+
+// Force re-initialization function
+window.reinitRandomSlot = function() {
+  console.log('Reinitializing random slot picker...');
+  if (window.RandomSlotManager) {
+    window.randomSlotManager = new window.RandomSlotManager();
+    console.log('Random slot picker reinitialized');
+  }
+};

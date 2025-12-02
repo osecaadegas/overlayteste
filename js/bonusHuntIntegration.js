@@ -18,21 +18,36 @@ class BonusHuntUI {
   initializeFromLocalStorage() {
     try {
       const savedData = localStorage.getItem('bonusHuntData');
-      console.log('Raw localStorage data:', savedData);
+      const timestamp = new Date().toLocaleTimeString();
+      console.log(`[${timestamp}] Initializing from localStorage, raw data:`, savedData);
       
       if (savedData) {
         const data = JSON.parse(savedData);
         console.log('Parsed data:', data);
         
         // Convert your existing bonus format to calculator format
-        const bonuses = (data.bonuses || []).map(bonus => ({
-          id: bonus.id,
-          name: bonus.slot,           // your 'slot' becomes 'name'
-          bet: bonus.bet,
-          win: bonus.payout !== null && bonus.payout !== undefined ? bonus.payout : null,     // your 'payout' becomes 'win'  
-          isSuper: bonus.isSuper || false,
-          timestamp: bonus.timestamp
-        }));
+        const bonuses = (data.bonuses || []).map(bonus => {
+          // Ensure proper payout/win conversion
+          let winValue = null;
+          if (bonus.payout !== null && bonus.payout !== undefined) {
+            winValue = parseFloat(bonus.payout);
+            // Only consider positive values as wins
+            if (winValue <= 0) {
+              winValue = null;
+            }
+          }
+          
+          const convertedBonus = {
+            id: bonus.id,
+            name: bonus.slot || bonus.name,           // your 'slot' becomes 'name'
+            bet: parseFloat(bonus.bet) || 0,
+            win: winValue,     // your 'payout' becomes 'win'  
+            isSuper: bonus.isSuper || false,
+            timestamp: bonus.timestamp
+          };
+          console.log('Converting bonus:', bonus, 'to:', convertedBonus);
+          return convertedBonus;
+        });
 
         // Get balance values from inputs or saved data
         const startMoney = this.getInputValue('start-money-input');
@@ -59,19 +74,29 @@ class BonusHuntUI {
    * Setup event listeners for automatic updates
    */
   setupEventListeners() {
-    // Listen for balance input changes
+    // Listen for balance input changes with comprehensive event monitoring
     const balanceInputs = [
       'start-money-input',
       'stop-money-input', 
-      'actual-balance-input'
+      'actual-balance-input',
+      'total-spent-input'
     ];
 
     balanceInputs.forEach(inputId => {
       const input = document.getElementById(inputId);
       if (input) {
-        input.addEventListener('input', () => {
-          this.updateCalculatorFromInputs();
-          this.updateAllDisplays();
+        // Add multiple event types to catch all possible changes
+        const eventTypes = ['input', 'change', 'keyup', 'paste', 'cut', 'blur'];
+        
+        eventTypes.forEach(eventType => {
+          input.addEventListener(eventType, () => {
+            // Add small delay for paste/cut events
+            setTimeout(() => {
+              console.log(`Input changed: ${inputId} (${eventType})`);
+              this.updateCalculatorFromInputs();
+              this.updateAllDisplays();
+            }, eventType === 'paste' || eventType === 'cut' ? 50 : 10);
+          });
         });
       }
     });
@@ -92,6 +117,104 @@ class BonusHuntUI {
         this.initializeFromLocalStorage();
       }
     }, 500);
+    
+    // Additional monitoring for input value changes
+    this.monitorInputChanges();
+    
+    // Set up MutationObserver to catch programmatic value changes
+    this.setupMutationObserver();
+  }
+
+  /**
+   * Set up MutationObserver to catch programmatic value changes
+   */
+  setupMutationObserver() {
+    const inputIds = ['start-money-input', 'stop-money-input', 'actual-balance-input', 'total-spent-input'];
+    
+    inputIds.forEach(inputId => {
+      const input = document.getElementById(inputId);
+      if (input) {
+        // Observe attribute changes (including value attribute)
+        const observer = new MutationObserver((mutations) => {
+          mutations.forEach((mutation) => {
+            if (mutation.type === 'attributes' && mutation.attributeName === 'value') {
+              console.log(`Programmatic value change detected in ${inputId}`);
+              setTimeout(() => {
+                this.updateCalculatorFromInputs();
+                this.updateAllDisplays();
+              }, 10);
+            }
+          });
+        });
+        
+        observer.observe(input, {
+          attributes: true,
+          attributeFilter: ['value']
+        });
+        
+        // Also use a Proxy to catch direct property changes
+        const originalValueDescriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+        if (originalValueDescriptor) {
+          Object.defineProperty(input, 'value', {
+            get: originalValueDescriptor.get,
+            set: function(newValue) {
+              const oldValue = originalValueDescriptor.get.call(this);
+              originalValueDescriptor.set.call(this, newValue);
+              if (oldValue !== newValue) {
+                console.log(`Direct value property change in ${inputId}: ${oldValue} -> ${newValue}`);
+                setTimeout(() => {
+                  if (window.bonusHuntUI) {
+                    window.bonusHuntUI.updateCalculatorFromInputs();
+                    window.bonusHuntUI.updateAllDisplays();
+                  }
+                }, 10);
+              }
+            },
+            enumerable: originalValueDescriptor.enumerable,
+            configurable: true
+          });
+        }
+      }
+    });
+  }
+
+  /**
+   * Monitor input changes continuously
+   */
+  monitorInputChanges() {
+    // Store last known values
+    this.lastInputValues = {
+      startMoney: this.getInputValue('start-money-input'),
+      targetMoney: this.getInputValue('stop-money-input'),
+      currentBalance: this.getInputValue('actual-balance-input'),
+      totalSpent: this.getInputValue('total-spent-input')
+    };
+    
+    // Check for changes every 200ms
+    setInterval(() => {
+      const currentValues = {
+        startMoney: this.getInputValue('start-money-input'),
+        targetMoney: this.getInputValue('stop-money-input'),
+        currentBalance: this.getInputValue('actual-balance-input'),
+        totalSpent: this.getInputValue('total-spent-input')
+      };
+      
+      // Check if any value has changed
+      let hasChanged = false;
+      for (const key in currentValues) {
+        if (currentValues[key] !== this.lastInputValues[key]) {
+          hasChanged = true;
+          console.log(`Input value changed: ${key} from ${this.lastInputValues[key]} to ${currentValues[key]}`);
+          break;
+        }
+      }
+      
+      if (hasChanged) {
+        this.lastInputValues = currentValues;
+        this.updateCalculatorFromInputs();
+        this.updateAllDisplays();
+      }
+    }, 200);
   }
 
   /**
@@ -102,12 +225,19 @@ class BonusHuntUI {
     const targetMoney = this.getInputValue('stop-money-input');
     const currentBalance = this.getInputValue('actual-balance-input');
 
+    console.log('Updating calculator with values:', { startMoney, targetMoney, currentBalance });
+
     this.calculator.updateData(
       this.calculator.bonuses, 
       startMoney, 
       targetMoney, 
       currentBalance
     );
+    
+    // Immediate refresh after data update
+    setTimeout(() => {
+      this.updateAllDisplays();
+    }, 10);
   }
 
   /**
@@ -122,7 +252,14 @@ class BonusHuntUI {
    * Call this whenever a bonus is added/updated/removed
    */
   onBonusDataChanged() {
+    console.log('Bonus data changed - refreshing statistics...');
     this.initializeFromLocalStorage();
+    
+    // Force immediate update after data change
+    setTimeout(() => {
+      this.updateCalculatorFromInputs();
+      this.updateAllDisplays();
+    }, 100);
   }
 
   /**
@@ -130,7 +267,8 @@ class BonusHuntUI {
    */
   updateAllDisplays() {
     const stats = this.calculator.calculateTotals();
-    console.log('Updating displays with stats:', stats);
+    const timestamp = new Date().toLocaleTimeString();
+    console.log(`[${timestamp}] Updating displays with stats:`, stats);
 
     // Update your existing stat elements
     this.updateStatElement('bh-stat-start', this.calculator.formatCurrency(stats.startMoney));
@@ -145,14 +283,9 @@ class BonusHuntUI {
       profitElement.style.color = stats.profitLoss >= 0 ? '#00ffb8' : '#ff5c5c';
     }
 
-    // Best and worst slots
-    this.updateStatElement('bh-stat-best', stats.bestSlot ? stats.bestSlot.name : '--');
-    this.updateStatElement('bh-stat-best-value', stats.bestSlot ? 
-      this.calculator.formatCurrency(stats.bestSlot.win) : '€0.00');
-    
-    this.updateStatElement('bh-stat-worst', stats.worstSlot ? stats.worstSlot.name : '--');
-    this.updateStatElement('bh-stat-worst-value', stats.worstSlot ? 
-      this.calculator.formatCurrency(stats.worstSlot.win) : '€0.00');
+    // Best and worst slots - display as images
+    this.updateSlotDisplay('bh-stat-best', stats.bestSlot);
+    this.updateSlotDisplay('bh-stat-worst', stats.worstSlot);
 
     // Counts and multipliers - with debug logging
     console.log('Total bonuses:', stats.totalBonuses);
@@ -162,7 +295,20 @@ class BonusHuntUI {
     // Use the correct element IDs from your HTML
     this.updateStatElement('bh-stat-total-bonuses', stats.totalBonuses.toString());
     this.updateStatElement('bh-stat-avg-multi', stats.averageMultiplier > 0 ? this.calculator.formatMultiplier(stats.averageMultiplier) : '0.00x');
-    this.updateStatElement('bh-stat-req-multi', stats.requiredMultiplier !== null && stats.requiredMultiplier > 0 ? this.calculator.formatMultiplier(stats.requiredMultiplier) : '0.00x');
+    
+    // Enhanced required multiplier display with detailed logging
+    console.log('Required multiplier calculation:', {
+      value: stats.requiredMultiplier,
+      totalSpent: stats.totalSpent,
+      totalWins: stats.totalWins,
+      startMoney: stats.startMoney,
+      currentBalance: stats.currentBalance,
+      bonusesWithWins: this.calculator.bonuses.filter(b => b.win && b.win > 0).length,
+      bonusesWithoutWins: this.calculator.bonuses.filter(b => !b.win || b.win <= 0).length
+    });
+    
+    const reqMultText = this.getRequiredMultiplierText(stats.requiredMultiplier);
+    this.updateStatElement('bh-stat-req-multi', reqMultText);
 
     // Update total spent input (auto-calculated)
     const totalSpentInput = document.getElementById('total-spent-input');
@@ -186,6 +332,99 @@ class BonusHuntUI {
     } else {
       console.warn(`Element not found: ${elementId}`);
     }
+  }
+
+  /**
+   * Get formatted text for required multiplier display
+   */
+  getRequiredMultiplierText(requiredMultiplier) {
+    if (requiredMultiplier === null) {
+      return 'N/A'; // No remaining bonuses or impossible to recover
+    } else if (requiredMultiplier <= 0) {
+      return '✅ 0.00x'; // Already profitable or break-even
+    } else if (requiredMultiplier > 1000) {
+      return '🔥 999+x'; // Very high multiplier needed
+    } else {
+      return this.calculator.formatMultiplier(requiredMultiplier);
+    }
+  }
+
+  /**
+   * Update slot display with image
+   */
+  updateSlotDisplay(elementId, slotData) {
+    const element = document.getElementById(elementId);
+    console.log(`Updating slot display for ${elementId}:`, slotData);
+    
+    if (element) {
+      if (slotData && slotData.name) {
+        // Get slot image using the same method as your existing system
+        const slotImage = this.getSlotImage(slotData.name);
+        console.log(`Using image: ${slotImage} for slot: ${slotData.name}`);
+        
+        element.innerHTML = `
+          <div style="display: flex; align-items: center; gap: 8px; width: 100%;">
+            <img src="${slotImage}" alt="${slotData.name}" style="width: 32px; height: 32px; border-radius: 4px; object-fit: cover; border: 1px solid rgba(255,255,255,0.2);" onerror="this.src='https://i.imgur.com/8E3ucNx.png';">
+            <div style="display: flex; flex-direction: column; align-items: flex-start; flex: 1; min-width: 0;">
+              <div style="font-size: 11px; font-weight: 600; color: #00e1ff; line-height: 1.2;">${this.calculator.formatCurrency(slotData.win)}</div>
+              <div style="font-size: 9px; color: #ffffff; line-height: 1.2;">(${this.calculator.formatMultiplier(slotData.multiplier)})</div>
+            </div>
+          </div>
+        `;
+      } else {
+        element.innerHTML = `
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <div style="width: 32px; height: 32px; background: rgba(255,255,255,0.1); border-radius: 4px; display: flex; align-items: center; justify-content: center; color: #666; font-size: 14px;">?</div>
+            <div style="display: flex; flex-direction: column; align-items: flex-start;">
+              <div style="font-size: 11px; color: #666;">€0.00</div>
+              <div style="font-size: 9px; color: #666;">(0.00x)</div>
+            </div>
+          </div>
+        `;
+      }
+    } else {
+      console.warn(`Element not found: ${elementId}`);
+    }
+  }
+
+  /**
+   * Get slot image using the same method as BonusHuntManager
+   */
+  getSlotImage(slotName) {
+    console.log('Getting image for slot:', slotName);
+    
+    // Use the existing BonusHuntManager's getSlotImage method if available
+    if (window.bonusHuntManager && typeof window.bonusHuntManager.getSlotImage === 'function') {
+      const image = window.bonusHuntManager.getSlotImage(slotName);
+      console.log('Got image from BonusHuntManager:', image);
+      return image;
+    }
+    
+    // Fallback: First check if there's a custom image URL in localStorage
+    try {
+      const savedImages = localStorage.getItem('customSlotImages');
+      if (savedImages) {
+        const images = JSON.parse(savedImages);
+        if (images[slotName.toLowerCase()]) {
+          console.log('Found custom image:', images[slotName.toLowerCase()]);
+          return images[slotName.toLowerCase()];
+        }
+      }
+    } catch (e) {
+      console.error('Error loading custom images:', e);
+    }
+    
+    // Then check the slot database
+    if (typeof window.slotDatabase !== 'undefined' && window.slotDatabase && window.slotDatabase.length > 0) {
+      const slot = window.slotDatabase.find(s => s.name.toLowerCase() === slotName.toLowerCase());
+      if (slot && slot.image) {
+        console.log('Found database image:', slot.image);
+        return slot.image;
+      }
+    }
+    
+    console.log('Using default fallback image');
+    return 'https://i.imgur.com/8E3ucNx.png'; // Default fallback image
   }
 
   /**
@@ -254,6 +493,19 @@ function integrateWithExistingSystem() {
   return huntUI;
 }
 
+// Global function to force refresh statistics (can be called from anywhere)
+window.refreshBonusHuntStats = function() {
+  console.log('Globally refreshing bonus hunt statistics...');
+  if (window.bonusHuntUI) {
+    window.bonusHuntUI.updateCalculatorFromInputs();
+    window.bonusHuntUI.updateAllDisplays();
+  }
+  if (window.bonusHuntManager) {
+    window.bonusHuntManager.updateStatsBar();
+    window.bonusHuntManager.refreshAllStatistics();
+  }
+};
+
 // Auto-initialize when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
   if (typeof BonusHuntCalculator !== 'undefined') {
@@ -266,7 +518,14 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log('Forcing initial data load...');
         window.bonusHuntUI.initializeFromLocalStorage();
       }
+      // Also call global refresh function
+      window.refreshBonusHuntStats();
     }, 1000);
+    
+    // Set up periodic refresh to catch any missed updates
+    setInterval(() => {
+      window.refreshBonusHuntStats();
+    }, 5000); // Refresh every 5 seconds as a backup
   }
 });
 
@@ -294,6 +553,51 @@ window.testBonusCalculator = function() {
   } else {
     console.error('bonusHuntUI not available');
   }
+};
+
+// Force refresh function
+window.refreshBonusStats = function() {
+  console.log('Force refreshing bonus stats...');
+  if (window.bonusHuntUI) {
+    window.bonusHuntUI.initializeFromLocalStorage();
+  }
+};
+
+// Debug function to test required multiplier calculation
+window.debugRequiredMultiplier = function() {
+  console.log('=== DEBUG REQUIRED MULTIPLIER ===');
+  if (window.bonusHuntUI) {
+    const stats = window.bonusHuntUI.getCurrentStats();
+    const bonuses = window.bonusHuntUI.calculator.bonuses;
+    
+    console.log('Current stats:', stats);
+    console.log('All bonuses:', bonuses);
+    
+    // Manual calculation
+    const totalSpent = stats.startMoney - stats.currentBalance;
+    const totalWinsSoFar = bonuses.reduce((sum, bonus) => {
+      return sum + (bonus.win || 0);
+    }, 0);
+    const remainingBets = bonuses.reduce((sum, bonus) => {
+      if (!bonus.win || bonus.win <= 0) {
+        return sum + bonus.bet;
+      }
+      return sum;
+    }, 0);
+    const requiredReturn = totalSpent - totalWinsSoFar;
+    const calculatedReqMult = remainingBets > 0 ? requiredReturn / remainingBets : null;
+    
+    console.log('Manual calculation:', {
+      totalSpent,
+      totalWinsSoFar,
+      remainingBets,
+      requiredReturn,
+      calculatedReqMult
+    });
+    
+    console.log('Calculator result:', stats.requiredMultiplier);
+  }
+  console.log('=== END DEBUG ===');
 };
 
 // Example of manual integration calls:

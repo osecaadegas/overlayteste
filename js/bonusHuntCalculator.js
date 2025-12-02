@@ -81,11 +81,15 @@ class BonusHuntCalculator {
    * @returns {Object|null} Best slot object with calculated multiplier
    */
   getBestSlot() {
+    console.log('Getting best slot from bonuses:', this.bonuses);
     const bonusesWithWins = this.bonuses.filter(bonus => 
-      typeof bonus.win === 'number' && bonus.win > 0
+      bonus && typeof bonus.win === 'number' && bonus.win !== null && bonus.win > 0
     );
+    
+    console.log('Bonuses with wins:', bonusesWithWins);
 
     if (bonusesWithWins.length === 0) {
+      console.log('No bonuses with wins found');
       return null;
     }
 
@@ -94,6 +98,7 @@ class BonusHuntCalculator {
 
     bonusesWithWins.forEach(bonus => {
       const multiplier = this.calculateSlotMultiplier(bonus);
+      console.log(`Slot: ${bonus.name}, Multiplier: ${multiplier}`);
       if (multiplier > highestMultiplier) {
         highestMultiplier = multiplier;
         bestSlot = {
@@ -103,6 +108,7 @@ class BonusHuntCalculator {
       }
     });
 
+    console.log('Best slot found:', bestSlot);
     return bestSlot;
   }
 
@@ -111,11 +117,15 @@ class BonusHuntCalculator {
    * @returns {Object|null} Worst slot object with calculated multiplier
    */
   getWorstSlot() {
+    console.log('Getting worst slot from bonuses:', this.bonuses);
     const bonusesWithWins = this.bonuses.filter(bonus => 
-      typeof bonus.win === 'number' && bonus.win > 0
+      bonus && typeof bonus.win === 'number' && bonus.win !== null && bonus.win > 0
     );
 
+    console.log('Bonuses with wins for worst:', bonusesWithWins);
+
     if (bonusesWithWins.length === 0) {
+      console.log('No bonuses with wins found for worst slot');
       return null;
     }
 
@@ -124,6 +134,7 @@ class BonusHuntCalculator {
 
     bonusesWithWins.forEach(bonus => {
       const multiplier = this.calculateSlotMultiplier(bonus);
+      console.log(`Slot: ${bonus.name}, Multiplier: ${multiplier}`);
       if (multiplier < lowestMultiplier) {
         lowestMultiplier = multiplier;
         worstSlot = {
@@ -133,6 +144,7 @@ class BonusHuntCalculator {
       }
     });
 
+    console.log('Worst slot found:', worstSlot);
     return worstSlot;
   }
 
